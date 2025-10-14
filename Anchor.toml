@@ -6,19 +6,19 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-signedvoting = "8Z52ChpaMPvvnSVjSrQmJirxiqpuNvQSprUebVWXyaCs"
+signedvoting = "EF5j7v44KDGfagMWfB9bNDyyvuVjWNwhCc5cdJFkYKdv"
 
 [programs.devnet]
-signedvoting = "8Z52ChpaMPvvnSVjSrQmJirxiqpuNvQSprUebVWXyaCs"
+signedvoting = "EF5j7v44KDGfagMWfB9bNDyyvuVjWNwhCc5cdJFkYKdv"
 
 [programs.mainnet]
-signedvoting = "8Z52ChpaMPvvnSVjSrQmJirxiqpuNvQSprUebVWXyaCs"
+signedvoting = "EF5j7v44KDGfagMWfB9bNDyyvuVjWNwhCc5cdJFkYKdv"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
