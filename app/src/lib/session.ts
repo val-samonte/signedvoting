@@ -53,8 +53,33 @@ export function isSessionValid(): boolean {
 }
 
 // Server-side session function for API routes
-export async function getServerSession(): Promise<{ user: SessionUser } | null> {
-  // This is a placeholder - in a real app you'd implement proper server-side session handling
-  // For now, we'll return null to indicate no session
-  return null;
+export async function getServerSession(cookieHeader?: string): Promise<{ user: SessionUser } | null> {
+  try {
+    if (!cookieHeader) return null;
+    
+    // Parse cookies
+    const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
+      const [key, value] = cookie.trim().split('=');
+      acc[key] = value;
+      return acc;
+    }, {} as Record<string, string>);
+    
+    // Get session cookie
+    const sessionCookie = cookies[SESSION_COOKIE_NAME];
+    if (!sessionCookie) return null;
+    
+    // Parse session data
+    const sessionData = JSON.parse(decodeURIComponent(sessionCookie));
+    
+    // Check if session is expired (7 days)
+    const isExpired = Date.now() - sessionData.timestamp > (COOKIE_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+    if (isExpired) {
+      return null;
+    }
+    
+    return { user: sessionData.user };
+  } catch (error) {
+    console.error('Error parsing server session:', error);
+    return null;
+  }
 }

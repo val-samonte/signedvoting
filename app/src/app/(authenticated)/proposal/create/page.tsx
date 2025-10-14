@@ -6,6 +6,7 @@ import { ProposalForm } from '@/components/ProposalForm';
 import { ProposalPreview } from '@/components/ProposalPreview';
 import { useAtom } from 'jotai';
 import { proposalFormDataAtom } from '@/store/proposal';
+import { userAtom } from '@/store';
 import { useAnchor } from '@/hooks/useAnchor';
 import { PublicKey } from '@solana/web3.js';
 
@@ -23,6 +24,7 @@ export default function CreateProposalPage() {
   const { isWalletConnected, walletPublicKey } = useAnchor();
   
   const [formData] = useAtom(proposalFormDataAtom);
+  const [user] = useAtom(userAtom);
   
   const [currentState, setCurrentState] = useState<ProposalState>('form');
   const [proposalId, setProposalId] = useState<number | null>(null);
@@ -32,6 +34,15 @@ export default function CreateProposalPage() {
   // Check if we're continuing from a previous step
   const continueParam = searchParams.get('continue');
   const idParam = searchParams.get('id');
+
+  // Check wallet connection immediately when page loads
+  useEffect(() => {
+    // Check if wallet is connected and matches user's wallet address
+    if (!isWalletConnected || !walletPublicKey || user?.wallet_address !== walletPublicKey.toBase58()) {
+      router.push('/my-wallet?redirect=/proposal/create');
+      return;
+    }
+  }, [isWalletConnected, walletPublicKey, user?.wallet_address, router]);
 
   useEffect(() => {
     if (continueParam && idParam) {
@@ -63,11 +74,6 @@ export default function CreateProposalPage() {
   };
 
   const handleFormSubmit = async (data: { name: string; description: string; choices: string[] }) => {
-    if (!isWalletConnected || !walletPublicKey) {
-      setError('Please connect your wallet first');
-      return;
-    }
-
     setCurrentState('creating');
     setError(null);
 

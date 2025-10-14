@@ -6,7 +6,8 @@ import crypto from 'crypto';
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession();
+    const cookieHeader = request.headers.get('cookie');
+    const session = await getServerSession(cookieHeader || undefined);
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
