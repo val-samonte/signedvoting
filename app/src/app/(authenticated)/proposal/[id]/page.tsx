@@ -462,7 +462,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
 
             {/* Details Panel - fixed width on xl, full width below */}
             <div className="xl:w-80 w-full">
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full xl:sticky xl:top-8">
                 <h2 className="text-lg font-semibold text-gray-900 mb-6">Details</h2>
                 
                 <div className="space-y-4">
