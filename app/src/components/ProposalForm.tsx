@@ -1,6 +1,6 @@
 'use client';
 
-import { useAtom } from 'jotai';
+import { useAtom, useSetAtom, useAtomValue } from 'jotai';
 import { PlusIcon, TrashIcon } from '@phosphor-icons/react';
 import { 
   proposalNameAtom, 
@@ -11,6 +11,7 @@ import {
   proposalChoicesAtom,
   proposalFormErrorsAtom,
   isProposalFormValidAtom,
+  validateProposalFormAtom,
   resetProposalFormAtom
 } from '@/store/proposal';
 import { useEffect } from 'react';
@@ -34,13 +35,14 @@ export function ProposalForm({
 }: ProposalFormProps) {
   const [name, setName] = useAtom(proposalNameAtom);
   const [description, setDescription] = useAtom(proposalDescriptionAtom);
-  const [choices] = useAtom(proposalChoicesAtom);
-  const [, setChoice] = useAtom(proposalChoiceAtom);
-  const [, addChoice] = useAtom(addChoiceAtom);
-  const [, removeChoice] = useAtom(removeChoiceAtom);
-  const [errors] = useAtom(proposalFormErrorsAtom);
-  const [isValid] = useAtom(isProposalFormValidAtom);
-  const [, resetForm] = useAtom(resetProposalFormAtom);
+  const choices = useAtomValue(proposalChoicesAtom);
+  const setChoice = useSetAtom(proposalChoiceAtom);
+  const addChoice = useSetAtom(addChoiceAtom);
+  const removeChoice = useSetAtom(removeChoiceAtom);
+  const errors = useAtomValue(proposalFormErrorsAtom);
+  const isValid = useAtomValue(isProposalFormValidAtom);
+  const validateForm = useSetAtom(validateProposalFormAtom);
+  const resetForm = useSetAtom(resetProposalFormAtom);
 
   // Initialize form with initial data
   useEffect(() => {
@@ -54,6 +56,12 @@ export function ProposalForm({
     setName(e.target.value);
   };
 
+  const handleNameBlur = () => {
+    if (disabled) return;
+    // Trigger validation to show/hide errors only on blur
+    validateForm();
+  };
+
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (disabled) return;
     setDescription(e.target.value);
@@ -62,6 +70,12 @@ export function ProposalForm({
   const handleChoiceChange = (index: number, value: string) => {
     if (disabled) return;
     setChoice({ index, value });
+  };
+
+  const handleChoiceBlur = () => {
+    if (disabled) return;
+    // Trigger validation to show/hide errors only on blur
+    validateForm();
   };
 
   const handleAddChoice = () => {
@@ -76,7 +90,11 @@ export function ProposalForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (disabled || !onSubmit || !isValid) return;
+    if (disabled || !onSubmit) return;
+    
+    // Validate form and show errors
+    const isValid = validateForm();
+    if (!isValid) return;
     
     onSubmit({
       name,
@@ -101,6 +119,7 @@ export function ProposalForm({
           id="name"
           value={name}
           onChange={handleNameChange}
+          onBlur={handleNameBlur}
           disabled={disabled}
           className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
             errors.name ? 'border-red-300' : 'border-gray-300'
@@ -152,6 +171,7 @@ export function ProposalForm({
                 type="text"
                 value={choice}
                 onChange={(e) => handleChoiceChange(index, e.target.value)}
+                onBlur={handleChoiceBlur}
                 disabled={disabled}
                 className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                   errors[`choices.${index}`] ? 'border-red-300' : 'border-gray-300'
@@ -162,7 +182,7 @@ export function ProposalForm({
                 <button
                   type="button"
                   onClick={() => handleRemoveChoice(index)}
-                  className="flex-shrink-0 p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                  className="flex-shrink-0 p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                 >
                   <TrashIcon size={16} />
                 </button>
@@ -178,7 +198,7 @@ export function ProposalForm({
             <button
               type="button"
               onClick={handleAddChoice}
-              className="flex items-center space-x-2 text-blue-600 hover:text-blue-800 text-sm font-medium"
+              className="flex items-center space-x-2 text-blue-600 hover:text-blue-800 text-sm font-medium cursor-pointer"
             >
               <PlusIcon size={16} />
               <span>Add Choice</span>
@@ -196,7 +216,7 @@ export function ProposalForm({
             className={`px-8 py-3 rounded-lg font-medium transition-colors ${
               disabled || !isValid
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
+                : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 cursor-pointer'
             }`}
           >
             Create Proposal

@@ -42,6 +42,10 @@ export default function CreateProposalPage() {
       router.push('/my-wallet?redirect=/proposal/create');
       return;
     }
+    
+    // Reset form state when wallet is properly connected
+    setIsDisabled(false);
+    setCurrentState('form');
   }, [isWalletConnected, walletPublicKey, user?.wallet_address, router]);
 
   useEffect(() => {
@@ -97,10 +101,18 @@ export default function CreateProposalPage() {
       }
 
       const result = await response.json();
+      console.log('API Response:', result);
+      console.log('User wallet address:', result.proposal.author.wallet_address);
+      console.log('Connected wallet:', walletPublicKey?.toBase58());
+      
       setProposalId(result.proposal.id);
 
       // Verify wallet address matches
-      if (result.proposal.author.wallet_address !== walletPublicKey.toBase58()) {
+      if (result.proposal.author.wallet_address !== walletPublicKey?.toBase58()) {
+        console.error('Wallet address mismatch:', {
+          stored: result.proposal.author.wallet_address,
+          connected: walletPublicKey?.toBase58()
+        });
         throw new Error('Wallet address mismatch. Please use the correct wallet.');
       }
 
