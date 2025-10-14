@@ -8,46 +8,53 @@ import { useAnchor } from '@/hooks/useAnchor';
 import { PublicKey } from '@solana/web3.js';
 
 type ProposalData = {
+  id: number;
   name: string;
   description: string;
   choices: string[];
+  hash: string;
+  payerPubkey: string;
+  pda?: string;
+  author: {
+    id: number;
+    username: string;
+    wallet_address: string;
+  };
 };
 
-type ProposalState = 'form' | 'creating' | 'onchain' | 'finalizing' | 'completed' | 'error';
+type ProposalState = 'loading' | 'onchain' | 'finalizing' | 'completed' | 'error';
 
-export default function CreateProposalPage() {
+export default function ProposalDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isWalletConnected, walletPublicKey } = useAnchor();
+  const { isWalletConnected, walletPublicKey, program } = useAnchor();
   
-  const [proposalData, setProposalData] = useState<ProposalData>({
-    name: '',
-    description: '',
-    choices: ['', '']
-  });
-  
-  const [currentState, setCurrentState] = useState<ProposalState>('form');
-  const [proposalId, setProposalId] = useState<number | null>(null);
+  const [proposal, setProposal] = useState<ProposalData | null>(null);
+  const [currentState, setCurrentState] = useState<ProposalState>('loading');
   const [error, setError] = useState<string | null>(null);
   const [isDisabled, setIsDisabled] = useState(false);
+  const [proposalId, setProposalId] = useState<number | null>(null);
 
   // Check if we're continuing from a previous step
   const continueParam = searchParams.get('continue');
-  const idParam = searchParams.get('id');
 
   useEffect(() => {
-    if (continueParam && idParam) {
-      // Remove the continue param from URL
-      const newUrl = new URL(window.location.href);
-      newUrl.searchParams.delete('continue');
-      window.history.replaceState({}, '', newUrl.toString());
-      
-      // Load the existing proposal and continue from onchain step
-      loadProposalAndContinue(parseInt(idParam));
-    }
-  }, [continueParam, idParam]);
+    const loadParams = async () => {
+      const resolvedParams = await params;
+      const id = parseInt(resolvedParams.id);
+      if (isNaN(id)) {
+        setError('Invalid proposal ID');
+        setCurrentState('error');
+        return;
+      }
+      setProposalId(id);
+      loadProposal(id);
+    };
+    
+    loadParams();
+  }, [params]);
 
-  const loadProposalAndContinue = async (id: number) => {
+  const loadProposal = async (id: number) => {
     try {
       const response = await fetch(`/api/proposal/${id}`);
       if (!response.ok) {
@@ -55,95 +62,56 @@ export default function CreateProposalPage() {
       }
       
       const data = await response.json();
-      setProposalData({
-        name: data.name,
-        description: data.description,
-        choices: data.choices,
-      });
-      setProposalId(id);
-      setCurrentState('onchain');
-      setIsDisabled(true);
+      setProposal(data);
+      
+      if (continueParam) {
+        // Remove the continue param from URL
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('continue');
+        window.history.replaceState({}, '', newUrl.toString());
+        
+        // Continue from onchain step
+        setCurrentState('onchain');
+        setIsDisabled(true);
+      } else if (data.pda) {
+        // Proposal is already finalized
+        setCurrentState('completed');
+        setIsDisabled(true);
+      } else {
+        // Proposal exists but not finalized - show as read-only
+        setCurrentState('completed');
+        setIsDisabled(true);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load proposal');
       setCurrentState('error');
     }
   };
 
-  const handleFormSubmit = async (formData: { name: string; description?: string; choices: string[] }) => {
-    if (!isWalletConnected || !walletPublicKey) {
-      setError('Please connect your wallet first');
+  const handleOnchainCreation = async () => {
+    if (!proposal || !isWalletConnected || !walletPublicKey) {
+      setError('Wallet not connected');
       return;
     }
-
-    setProposalData({
-      name: formData.name,
-      description: formData.description || '',
-      choices: formData.choices,
-    });
-    setCurrentState('creating');
-    setError(null);
-
-    try {
-      // Step 1: Create proposal in database
-      const response = await fetch('/api/proposal', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          description: formData.description || '',
-          choices: formData.choices,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create proposal');
-      }
-
-      const result = await response.json();
-      setProposalId(result.proposal.id);
-
-      // Verify wallet address matches
-      if (result.proposal.author.wallet_address !== walletPublicKey.toBase58()) {
-        throw new Error('Wallet address mismatch. Please use the correct wallet.');
-      }
-
-      // Redirect to proposal page with continue param
-      router.push(`/proposal/${result.proposal.id}?continue`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create proposal');
-      setCurrentState('error');
-    }
-  };
-
-  const handleOnchainCreation = async () => {
-    if (!proposalId) return;
 
     setCurrentState('onchain');
     setError(null);
 
     try {
-      // Get the proposal data to retrieve hash and payer pubkey
-      const response = await fetch(`/api/proposal/${proposalId}`);
-      if (!response.ok) {
-        throw new Error('Failed to load proposal data');
+      // Verify wallet address matches
+      if (proposal.author.wallet_address !== walletPublicKey.toBase58()) {
+        throw new Error('Wallet address mismatch. Please use the correct wallet.');
       }
-
-      const proposal = await response.json();
       
       // Call the anchor program to create the proposal onchain
-      const { program, provider } = useAnchor();
-      
       const hashBytes = Buffer.from(proposal.hash, 'hex');
-      const uri = `/proposal/${proposalId}`;
+      const uri = `/proposal/${proposal.id}`;
       
       // Create the transaction
       const tx = await program.methods
         .createProposal(uri, Array.from(hashBytes))
         .accounts({
-          author: walletPublicKey!,
+          author: walletPublicKey,
           payer: new PublicKey(proposal.payerPubkey),
         })
         .rpc({ commitment: 'confirmed' });
@@ -160,10 +128,10 @@ export default function CreateProposalPage() {
   };
 
   const handleFinalization = async () => {
-    if (!proposalId) return;
+    if (!proposal) return;
 
     try {
-      const response = await fetch(`/api/proposal/${proposalId}/finalize`, {
+      const response = await fetch(`/api/proposal/${proposal.id}/finalize`, {
         method: 'POST',
       });
 
@@ -172,11 +140,15 @@ export default function CreateProposalPage() {
         throw new Error(errorData.error || 'Failed to finalize proposal');
       }
 
+      const result = await response.json();
+      
+      // Update proposal with PDA
+      setProposal(prev => prev ? { ...prev, pda: result.pda } : null);
       setCurrentState('completed');
       
-      // Redirect to the proposal page
+      // Redirect to the proposal page without continue param
       setTimeout(() => {
-        router.push(`/proposal/${proposalId}`);
+        router.push(`/proposal/${proposal.id}`);
       }, 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to finalize proposal');
@@ -186,12 +158,12 @@ export default function CreateProposalPage() {
 
   const renderStateMessage = () => {
     switch (currentState) {
-      case 'creating':
+      case 'loading':
         return (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <div className="flex items-center">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
-              <span className="text-blue-800">Creating proposal in database...</span>
+              <span className="text-blue-800">Loading proposal...</span>
             </div>
           </div>
         );
@@ -201,7 +173,7 @@ export default function CreateProposalPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600 mr-3"></div>
-                <span className="text-yellow-800">Creating proposal on blockchain...</span>
+                <span className="text-yellow-800">Ready to create proposal on blockchain...</span>
               </div>
               <button
                 onClick={handleOnchainCreation}
@@ -222,14 +194,14 @@ export default function CreateProposalPage() {
           </div>
         );
       case 'completed':
-        return (
+        return proposal?.pda ? (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
             <div className="flex items-center">
               <div className="w-4 h-4 bg-green-600 rounded-full mr-3"></div>
-              <span className="text-green-800">Proposal created successfully! Redirecting...</span>
+              <span className="text-green-800">Proposal created successfully!</span>
             </div>
           </div>
-        );
+        ) : null;
       case 'error':
         return (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
@@ -240,7 +212,7 @@ export default function CreateProposalPage() {
               </div>
               <button
                 onClick={() => {
-                  setCurrentState('form');
+                  setCurrentState('onchain');
                   setError(null);
                 }}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
@@ -255,13 +227,38 @@ export default function CreateProposalPage() {
     }
   };
 
+  if (currentState === 'loading') {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!proposal) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900">Proposal not found</h1>
+            <p className="mt-2 text-gray-600">The proposal you're looking for doesn't exist.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Create Proposal</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Proposal #{proposal.id}</h1>
           <p className="mt-2 text-gray-600">
-            Create a new voting proposal for the community
+            {proposal.pda ? 'Published proposal' : 'Draft proposal'}
           </p>
         </div>
 
@@ -273,10 +270,13 @@ export default function CreateProposalPage() {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-6">Proposal Details</h2>
               <ProposalForm
-                initialData={proposalData}
-                onSubmit={handleFormSubmit}
+                initialData={{
+                  name: proposal.name,
+                  description: proposal.description,
+                  choices: proposal.choices,
+                }}
                 disabled={isDisabled}
-                showSubmit={currentState === 'form'}
+                showSubmit={false}
               />
             </div>
           </div>
@@ -284,9 +284,9 @@ export default function CreateProposalPage() {
           {/* Preview Column */}
           <div>
             <ProposalPreview
-              name={proposalData.name}
-              description={proposalData.description || ''}
-              choices={proposalData.choices.filter(choice => choice.trim() !== '')}
+              name={proposal.name}
+              description={proposal.description || ''}
+              choices={proposal.choices.filter(choice => choice.trim() !== '')}
             />
           </div>
         </div>

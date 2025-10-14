@@ -34,6 +34,9 @@ const createDummyWallet = (): Wallet => {
 // Connection atom
 export const connectionAtom = atom(new Connection(DEVNET_RPC, 'confirmed'));
 
+// Export connection for server-side use
+export const connection = new Connection(DEVNET_RPC, 'confirmed');
+
 // Wallet atom - this will be set by the wallet provider
 export const walletAtom = atom<Wallet | null>(null);
 

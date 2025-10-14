@@ -51,3 +51,10 @@ export function clearSession() {
 export function isSessionValid(): boolean {
   return getSession() !== null
 }
+
+// Server-side session function for API routes
+export async function getServerSession(): Promise<{ user: SessionUser } | null> {
+  // This is a placeholder - in a real app you'd implement proper server-side session handling
+  // For now, we'll return null to indicate no session
+  return null;
+}
