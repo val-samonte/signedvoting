@@ -8,6 +8,12 @@ skip-lint = false
 [programs.localnet]
 signedvoting = "8Z52ChpaMPvvnSVjSrQmJirxiqpuNvQSprUebVWXyaCs"
 
+[programs.devnet]
+signedvoting = "8Z52ChpaMPvvnSVjSrQmJirxiqpuNvQSprUebVWXyaCs"
+
+[programs.mainnet]
+signedvoting = "8Z52ChpaMPvvnSVjSrQmJirxiqpuNvQSprUebVWXyaCs"
+
 [registry]
 url = "https://api.apr.dev"
 

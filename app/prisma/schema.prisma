@@ -34,6 +34,7 @@ model Proposal {
   description String   // expected to be markdown
   choices     String   // JSON array of the choices
   hash        String   // hash of the name + description + JSON of choices
+  pda         String?  // 32 bytes (pda of the proposal on-chain), nullable
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
 
