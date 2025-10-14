@@ -5,3 +5,7 @@ target
 node_modules
 test-ledger
 .yarn
+
+# Database files
+app/prisma/dev.db
+app/prisma/*.db
