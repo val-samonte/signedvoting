@@ -277,9 +277,9 @@ export default function CreateProposalPage() {
 
         {renderStateMessage()}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
           {/* Form Column */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 h-fit">
             <h2 className="text-xl font-semibold text-gray-900 mb-6">Proposal Details</h2>
             <ProposalForm
               onSubmit={handleFormSubmit}
@@ -289,7 +289,7 @@ export default function CreateProposalPage() {
           </div>
 
           {/* Preview Column */}
-          <div>
+          <div className="h-fit">
             <ProposalPreview
               name={formData.name}
               description={formData.description}

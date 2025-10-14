@@ -14,7 +14,7 @@ export function ProposalPreview({ name, description, choices }: ProposalPreviewP
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 h-fit">
       <h2 className="text-xl font-semibold text-gray-900 mb-4">Preview</h2>
       
       <div className="space-y-6">
