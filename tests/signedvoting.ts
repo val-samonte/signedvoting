@@ -28,11 +28,11 @@ describe("signedvoting", () => {
     author = anchor.web3.Keypair.generate();
     voter = anchor.web3.Keypair.generate();
 
-    // Airdrop SOL to test accounts
+    // Airdrop SOL only to author (proposal creator)
     await provider.connection.requestAirdrop(author.publicKey, 2 * anchor.web3.LAMPORTS_PER_SOL);
-    await provider.connection.requestAirdrop(voter.publicKey, 2 * anchor.web3.LAMPORTS_PER_SOL);
+    // Note: voter has 0 SOL balance - they shouldn't need any SOL to vote
 
-    // Wait for airdrops to confirm
+    // Wait for airdrop to confirm
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Find proposal PDA
@@ -96,7 +96,7 @@ describe("signedvoting", () => {
     const wrongPayer = anchor.web3.Keypair.generate();
     const differentVoter = anchor.web3.Keypair.generate();
     await provider.connection.requestAirdrop(wrongPayer.publicKey, anchor.web3.LAMPORTS_PER_SOL);
-    await provider.connection.requestAirdrop(differentVoter.publicKey, anchor.web3.LAMPORTS_PER_SOL);
+    // Note: differentVoter has 0 SOL balance - they shouldn't need any SOL to vote
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Find vote PDA for the different voter
