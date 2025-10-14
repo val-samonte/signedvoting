@@ -1,1 +1,34 @@
 @import "tailwindcss";
+
+/* Custom styles for SignedVoting */
+html, body {
+  height: 100%;
+}
+
+/* Ensure proper scrolling behavior */
+.overflow-hidden {
+  overflow: hidden;
+}
+
+/* Smooth transitions for mobile menu */
+.sidebar-transition {
+  transition: transform 0.3s ease-in-out;
+}
+
+/* Custom scrollbar for sidebar */
+.sidebar-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 2px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: #d1d5db;
+}
