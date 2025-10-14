@@ -46,7 +46,7 @@ export function Navigation() {
   const navItems = [
     { name: 'Recent Proposals', href: '/home', icon: ListIcon },
     { name: 'My Proposals', href: '/my-proposals', icon: UserIcon },
-    { name: 'Create Proposal', href: '/create-proposal', icon: PlusIcon },
+    { name: 'Create Proposal', href: '/proposal/create', icon: PlusIcon },
   ];
 
   return (

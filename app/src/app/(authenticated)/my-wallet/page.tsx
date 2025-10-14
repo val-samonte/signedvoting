@@ -7,6 +7,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useState, useEffect } from 'react';
 import { Connection, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { WalletIcon, CheckCircleIcon, WarningCircleIcon } from '@phosphor-icons/react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function MyWalletPage() {
   const [user] = useAtom(userAtom);
@@ -16,6 +17,8 @@ export default function MyWalletPage() {
   
   const { publicKey, signMessage, connected, disconnect } = useWallet();
   const connection = new Connection('https://api.devnet.solana.com');
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Fetch wallet balance when connected
   useEffect(() => {
@@ -33,6 +36,20 @@ export default function MyWalletPage() {
       setWalletBalance(null);
     }
   }, [publicKey, setWalletBalance]);
+
+  // Handle redirect after successful wallet linking
+  useEffect(() => {
+    const redirectParam = searchParams.get('redirect');
+    const isCorrectWallet = connected && publicKey?.toString() === user?.wallet_address;
+    
+    if (redirectParam && isCorrectWallet && user?.wallet_address) {
+      // Remove the redirect parameter and navigate
+      const url = new URL(window.location.href);
+      url.searchParams.delete('redirect');
+      window.history.replaceState({}, '', url.toString());
+      router.push(redirectParam);
+    }
+  }, [connected, publicKey, user?.wallet_address, searchParams, router]);
 
   const handleSignMessage = async () => {
     if (!signMessage || !user || !publicKey || !user.id || !user.username) {

@@ -30,9 +30,10 @@ model Proposal {
   id          Int      @id @default(autoincrement())
   author_id   Int
   payer       String   // 64 bytes (Solana keypair)
+  name        String   // proposal name/title
   description String   // expected to be markdown
   choices     String   // JSON array of the choices
-  hash        String   // hash of the description + JSON of choices
+  hash        String   // hash of the name + description + JSON of choices
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
 
