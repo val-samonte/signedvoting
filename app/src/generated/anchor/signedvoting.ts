@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/signedvoting.json`.
  */
 export type Signedvoting = {
-  "address": "8Z52ChpaMPvvnSVjSrQmJirxiqpuNvQSprUebVWXyaCs",
+  "address": "EF5j7v44KDGfagMWfB9bNDyyvuVjWNwhCc5cdJFkYKdv",
   "metadata": {
     "name": "signedvoting",
     "version": "0.1.0",
