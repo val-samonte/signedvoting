@@ -28,7 +28,7 @@ pub struct VoteInstruction<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn vote(ctx: Context<VoteInstruction>, choice: u8) -> Result<()> {
+pub fn vote_handler(ctx: Context<VoteInstruction>, choice: u8) -> Result<()> {
     let vote = &mut ctx.accounts.vote;
     vote.voter = ctx.accounts.voter.key();
     vote.proposal_id = ctx.accounts.proposal.key();

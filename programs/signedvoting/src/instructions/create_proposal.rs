@@ -22,7 +22,7 @@ pub struct CreateProposal<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn create_proposal(ctx: Context<CreateProposal>, uri: String, hash: [u8; 32]) -> Result<()> {
+pub fn create_proposal_handler(ctx: Context<CreateProposal>, uri: String, hash: [u8; 32]) -> Result<()> {
     let proposal = &mut ctx.accounts.proposal;
     proposal.author = ctx.accounts.author.key();
     proposal.payer = ctx.accounts.payer.key();
