@@ -6,38 +6,29 @@ import crypto from 'crypto';
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Proposal creation request received');
     
     const cookieHeader = request.headers.get('cookie');
     const session = await getServerSession(cookieHeader || undefined);
     if (!session?.user) {
-      console.log('No session found');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log('Session user:', session.user);
-
     const { name, description, choices } = await request.json();
-    console.log('Request data:', { name, description, choices });
 
     // Validate input
     if (!name || !choices || choices.length < 2) {
-      console.log('Invalid proposal data');
       return NextResponse.json({ error: 'Invalid proposal data' }, { status: 400 });
     }
 
     // Generate hash: sha256(concat name + description + JSON.stringify(choices))
     const hashInput = name + (description || '') + JSON.stringify(choices);
     const hash = crypto.createHash('sha256').update(hashInput).digest('hex');
-    console.log('Generated hash:', hash);
 
     // Generate a new keypair for the payer
     const payerKeypair = Keypair.generate();
     const payerBase64 = Buffer.from(payerKeypair.secretKey).toString('base64'); // Store as base64
-    console.log('Generated payer keypair');
 
     // Create the proposal in the database
-    console.log('Creating proposal in database...');
     const proposal = await prisma.proposal.create({
       data: {
         author_id: session.user.id,
@@ -52,7 +43,6 @@ export async function POST(request: NextRequest) {
         author: true,
       },
     });
-    console.log('Proposal created successfully:', proposal.id);
 
     return NextResponse.json({
       success: true,
@@ -71,8 +61,6 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error creating proposal:', error);
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

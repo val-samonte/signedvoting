@@ -83,7 +83,6 @@ export async function registerUser(formData: {
       }
     }
 
-    console.error('Registration error:', error)
     return {
       success: false,
       errors: ['An unexpected error occurred during registration']

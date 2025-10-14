@@ -8,6 +8,7 @@ import { useAtom } from 'jotai';
 import { proposalFormDataAtom } from '@/store/proposal';
 import { userAtom } from '@/store';
 import { useAnchor } from '@/hooks/useAnchor';
+import { useWalletProtection } from '@/hooks/useWalletProtection';
 import { PublicKey } from '@solana/web3.js';
 
 type ProposalData = {
@@ -23,6 +24,9 @@ export default function CreateProposalPage() {
   const searchParams = useSearchParams();
   const { isWalletConnected, walletPublicKey } = useAnchor();
   
+  // Apply wallet protection - we'll get the current URL inside the hook
+  const { isProtected } = useWalletProtection();
+  
   const [formData] = useAtom(proposalFormDataAtom);
   const [user] = useAtom(userAtom);
   
@@ -35,18 +39,13 @@ export default function CreateProposalPage() {
   const continueParam = searchParams.get('continue');
   const idParam = searchParams.get('id');
 
-  // Check wallet connection immediately when page loads
+  // Reset form state when wallet is properly connected
   useEffect(() => {
-    // Check if wallet is connected and matches user's wallet address
-    if (!isWalletConnected || !walletPublicKey || user?.wallet_address !== walletPublicKey.toBase58()) {
-      router.push('/my-wallet?redirect=/proposal/create');
-      return;
+    if (isProtected) {
+      setIsDisabled(false);
+      setCurrentState('form');
     }
-    
-    // Reset form state when wallet is properly connected
-    setIsDisabled(false);
-    setCurrentState('form');
-  }, [isWalletConnected, walletPublicKey, user?.wallet_address, router]);
+  }, [isProtected]);
 
   useEffect(() => {
     if (continueParam && idParam) {
@@ -101,23 +100,15 @@ export default function CreateProposalPage() {
       }
 
       const result = await response.json();
-      console.log('API Response:', result);
-      console.log('User wallet address:', result.proposal.author.wallet_address);
-      console.log('Connected wallet:', walletPublicKey?.toBase58());
       
       setProposalId(result.proposal.id);
 
       // Verify wallet address matches
       if (result.proposal.author.wallet_address !== walletPublicKey?.toBase58()) {
-        console.error('Wallet address mismatch:', {
-          stored: result.proposal.author.wallet_address,
-          connected: walletPublicKey?.toBase58()
-        });
         throw new Error('Wallet address mismatch. Please use the correct wallet.');
       }
 
       // Redirect to proposal page with continue param
-      console.log('Redirecting to:', `/proposal/${result.proposal.id}?continue`);
       router.push(`/proposal/${result.proposal.id}?continue`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create proposal');
@@ -155,7 +146,6 @@ export default function CreateProposalPage() {
         })
         .rpc({ commitment: 'confirmed' });
 
-      console.log('Transaction signature:', tx);
       
       // Move to finalization step
       setCurrentState('finalizing');
@@ -261,6 +251,19 @@ export default function CreateProposalPage() {
         return null;
     }
   };
+
+  // Show loading while wallet protection is being checked
+  if (!isProtected) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">

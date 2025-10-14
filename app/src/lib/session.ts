@@ -38,7 +38,6 @@ export function getSession(): SessionUser | null {
     
     return sessionData.user
   } catch (error) {
-    console.error('Error parsing session cookie:', error)
     clearSession()
     return null
   }
@@ -79,7 +78,6 @@ export async function getServerSession(cookieHeader?: string): Promise<{ user: S
     
     return { user: sessionData.user };
   } catch (error) {
-    console.error('Error parsing server session:', error);
     return null;
   }
 }

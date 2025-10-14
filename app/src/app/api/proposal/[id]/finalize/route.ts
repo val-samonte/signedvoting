@@ -87,12 +87,10 @@ export async function POST(
         success: true,
         pda: pdaAddress.toBase58(),
       });
-    } catch (error) {
-      console.error('Error verifying onchain proposal:', error);
-      return NextResponse.json({ error: 'Failed to verify onchain proposal' }, { status: 500 });
-    }
+      } catch (error) {
+        return NextResponse.json({ error: 'Failed to verify onchain proposal' }, { status: 500 });
+      }
   } catch (error) {
-    console.error('Error finalizing proposal:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

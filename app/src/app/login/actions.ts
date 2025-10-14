@@ -60,7 +60,6 @@ export async function loginUser(formData: {
       }
     }
 
-    console.error('Login error:', error)
     return {
       success: false,
       errors: ['An unexpected error occurred during login']

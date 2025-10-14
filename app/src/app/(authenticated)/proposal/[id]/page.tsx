@@ -7,6 +7,7 @@ import { ProposalPreview } from '@/components/ProposalPreview';
 import { useAtom } from 'jotai';
 import { proposalFormDataAtom } from '@/store/proposal';
 import { useAnchor } from '@/hooks/useAnchor';
+import { useWalletProtection } from '@/hooks/useWalletProtection';
 import { PublicKey } from '@solana/web3.js';
 
 type ProposalData = {
@@ -30,6 +31,9 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isWalletConnected, walletPublicKey, program } = useAnchor();
+  
+  // Apply wallet protection - we'll get the current URL inside the hook
+  const { isProtected } = useWalletProtection();
   
   const [formData] = useAtom(proposalFormDataAtom);
   const [proposal, setProposal] = useState<ProposalData | null>(null);
@@ -60,8 +64,6 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
       // Don't load proposal if we're already in signing process
       if (!isInSigningProcess) {
         loadProposal(id);
-      } else {
-        console.log('STATE CHANGE: skipping loadProposal - already in signing process');
       }
     };
     
@@ -82,16 +84,9 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   }, [hasProcessedContinue, isInSigningProcess, isWalletConnected, walletPublicKey, program]);
 
   const loadProposal = async (id: number) => {
-    console.log('STATE CHANGE: loadProposal called', JSON.stringify({
-      hasLoadedProposal,
-      isInSigningProcess,
-      currentState,
-      isLoadingRef: isLoadingRef.current
-    }, null, 2));
     
     // Prevent multiple loads if we're already loading or in signing process
     if (isLoadingRef.current || (hasLoadedProposal && isInSigningProcess)) {
-      console.log('STATE CHANGE: skipping loadProposal - already loading or in signing process');
       return;
     }
     
@@ -118,19 +113,12 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
         
         if (continueParam || urlHasContinue) {
           // Auto-resume with ?continue
-          console.log('STATE CHANGE: ?continue detected, setting to signing');
           setCurrentState('signing');
           setIsDisabled(true);
           setHasProcessedContinue(true);
           setIsInSigningProcess(true);
         } else {
           // Show as read-only with Continue button
-          console.log('STATE CHANGE: no ?continue, setting to draft', {
-            hasLoadedProposal,
-            isInSigningProcess,
-            currentState,
-            stackTrace: new Error().stack
-          });
           setCurrentState('draft');
           setIsDisabled(true);
         }
@@ -149,7 +137,6 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
       return;
     }
 
-    console.log('STATE CHANGE: setting to signing');
     setCurrentState('signing');
     setError(null);
     setUserCancelledTx(false); // Reset cancellation flag
@@ -176,7 +163,6 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
 
       
       // Move to finalization step
-      console.log('STATE CHANGE: setting to finalizing');
       setCurrentState('finalizing');
       await handleFinalization();
     } catch (err) {
@@ -190,13 +176,11 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                              errorMessage.includes('rejected');
       
       if (isUserCancelled) {
-        console.log('STATE CHANGE: user cancelled, setting to draft');
         setUserCancelledTx(true);
         setCurrentState('draft'); // Go back to draft state to show yellow card
         setError(null); // Clear any error message
         setIsInSigningProcess(false); // Reset signing process flag
       } else {
-        console.log('STATE CHANGE: error occurred, setting to error');
         setError(errorMessage);
         setCurrentState('error');
       }
@@ -220,7 +204,6 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
       
       // Update proposal with PDA
       setProposal(prev => prev ? { ...prev, pda: result.pda } : null);
-      console.log('STATE CHANGE: finalization complete, setting to draft');
       setCurrentState('draft');
       setIsInSigningProcess(false); // Reset signing process flag
       
@@ -237,27 +220,15 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   const renderStateMessage = () => {
     // If proposal is finalized (has PDA), don't show any status card
     if (proposal?.pda) {
-      console.log('INFO PANEL: Hidden (proposal finalized)');
       return null;
     }
 
     // Check if ?continue is present in URL
     const continueParam = searchParams.get('continue');
     const hasContinueParam = continueParam !== null;
-    
-    console.log('INFO PANEL STATE:', JSON.stringify({
-      currentState,
-      hasContinueParam,
-      isWalletConnected,
-      isInSigningProcess,
-      hasProcessedContinue,
-      userCancelledTx,
-      proposalPda: proposal?.pda
-    }, null, 2));
 
     switch (currentState) {
       case 'loading':
-        console.log('INFO PANEL: Blue (loading)');
         return (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <div className="flex items-center">
@@ -271,7 +242,6 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
         // Show blue card when user is signing transaction (Step 2)
         // Check if wallet is connected to show appropriate message
         if (!isWalletConnected) {
-          console.log('INFO PANEL: Blue (waiting for wallet)');
           return (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <div className="flex items-center">
@@ -282,7 +252,6 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
           );
         }
         
-        console.log('INFO PANEL: Blue (signing transaction)');
         return (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <div className="flex items-center">
@@ -293,7 +262,6 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
         );
       
       case 'finalizing':
-        console.log('INFO PANEL: Green (finalizing)');
         return (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
             <div className="flex items-center">
@@ -305,7 +273,6 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
       
       case 'draft':
         // Always show yellow card with Continue button when in draft state
-        console.log('INFO PANEL: Yellow (draft - ready for Continue)');
         return (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
             <div className="flex items-center justify-between">
@@ -327,7 +294,6 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
         );
       
       case 'error':
-        console.log('INFO PANEL: Red (error)');
         return (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <div className="flex items-center justify-between">
@@ -352,6 +318,19 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
         return null;
     }
   };
+
+  // Show loading while wallet protection is being checked
+  if (!isProtected) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (currentState === 'loading') {
     return (

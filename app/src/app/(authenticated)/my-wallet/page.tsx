@@ -28,7 +28,7 @@ export default function MyWalletPage() {
           const balance = await connection.getBalance(publicKey);
           setWalletBalance(balance / LAMPORTS_PER_SOL);
         } catch (error) {
-          console.error('Error fetching balance:', error);
+          // Error fetching balance
         }
       };
       fetchBalance();
@@ -41,6 +41,7 @@ export default function MyWalletPage() {
   useEffect(() => {
     const redirectParam = searchParams.get('redirect');
     const isCorrectWallet = connected && publicKey?.toString() === user?.wallet_address;
+    
     
     if (redirectParam && isCorrectWallet && user?.wallet_address) {
       // Remove the redirect parameter and navigate
@@ -82,11 +83,9 @@ export default function MyWalletPage() {
         updateUser(result.user);
       } else {
         const error = await response.json();
-        console.error('Verification failed:', error);
         alert('Wallet verification failed: ' + error.error);
       }
     } catch (error) {
-      console.error('Error signing message:', error);
       alert('Error signing message. Please try again.');
     } finally {
       setIsSigning(false);

@@ -42,7 +42,6 @@ export async function GET(
       const payerKeypair = Keypair.fromSecretKey(Buffer.from(proposal.payer, 'base64'));
       payerPubkeyBase58 = payerKeypair.publicKey.toBase58();
     } catch (error) {
-      console.error('Error parsing payer keypair:', error);
       // Fallback: return a placeholder or handle the error
       payerPubkeyBase58 = 'Invalid keypair';
     }
@@ -62,7 +61,6 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('Error fetching proposal:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
