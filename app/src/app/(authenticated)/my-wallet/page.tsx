@@ -86,15 +86,13 @@ export default function MyWalletPage() {
             <WalletIcon size={64} className="mx-auto text-gray-400 mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Link Your Wallet</h2>
             <p className="text-gray-600 mb-8">
-              You have not linked your wallet yet to your account!
+              You have not linked your wallet yet to your account! <br />
+              Connect your wallet to link it to your account.
             </p>
             
             {!connected ? (
               <div className="space-y-4">
                 <WalletMultiButton className="!bg-blue-600 hover:!bg-blue-700 !rounded-lg !px-6 !py-3 !text-white !font-medium" />
-                <p className="text-sm text-gray-500">
-                  Connect your wallet to link it to your account
-                </p>
               </div>
             ) : (
               <div className="space-y-6">

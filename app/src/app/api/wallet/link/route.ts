@@ -2,11 +2,31 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PublicKey } from '@solana/web3.js';
 import nacl from 'tweetnacl';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/session';
+import { cookies } from 'next/headers';
 
 export async function POST(request: NextRequest) {
   try {
-    const session = getSession();
+    // Get session from cookies on server side
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get('signedvoting_session');
+    
+    if (!sessionCookie) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    let session;
+    try {
+      const sessionData = JSON.parse(sessionCookie.value);
+      // Check if session is expired (7 days)
+      const isExpired = Date.now() - sessionData.timestamp > (7 * 24 * 60 * 60 * 1000);
+      if (isExpired) {
+        return NextResponse.json({ error: 'Session expired' }, { status: 401 });
+      }
+      session = sessionData.user;
+    } catch (error) {
+      return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+    }
+    
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
