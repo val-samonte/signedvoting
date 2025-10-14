@@ -7,9 +7,13 @@ import { ProposalPreview } from '@/components/ProposalPreview';
 import { useAtom } from 'jotai';
 import { proposalFormDataAtom } from '@/store/proposal';
 import { useAnchor } from '@/hooks/useAnchor';
-import { useWalletProtection } from '@/hooks/useWalletProtection';
+import { isWalletConnectedAtom, walletPublicKeyAtom } from '@/lib/anchor';
+import { userAtom } from '@/store';
+// import { useWalletProtection } from '@/hooks/useWalletProtection';
 import { PublicKey } from '@solana/web3.js';
 import { PauseIcon } from '@phosphor-icons/react';
+import { MarkdownRenderer } from '@/components/MarkdownRenderer';
+import { trimAddress } from '@/lib/utils';
 
 type ProposalData = {
   id: number;
@@ -32,9 +36,9 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isWalletConnected, walletPublicKey, program } = useAnchor();
-  
-  // Apply wallet protection - we'll get the current URL inside the hook
-  const { isProtected } = useWalletProtection();
+  const [user] = useAtom(userAtom);
+  const [isWalletConnectedState] = useAtom(isWalletConnectedAtom);
+  const [walletPublicKeyState] = useAtom(walletPublicKeyAtom);
   
   const [formData] = useAtom(proposalFormDataAtom);
   const [proposal, setProposal] = useState<ProposalData | null>(null);
@@ -46,7 +50,15 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   const [userCancelledTx, setUserCancelledTx] = useState(false);
   const [isInSigningProcess, setIsInSigningProcess] = useState(false);
   const [hasLoadedProposal, setHasLoadedProposal] = useState(false);
+  const [onchainHash, setOnchainHash] = useState<string | null>(null);
+  const [isHashLoading, setIsHashLoading] = useState(false);
+  const [isProposalFinalized, setIsProposalFinalized] = useState(false);
   const isLoadingRef = useRef(false);
+
+  // We'll handle wallet protection manually after loading the proposal
+  // const { isProtected } = useWalletProtection();
+
+  // No automatic wallet protection - we'll handle it manually after loading proposal
 
   // Check if we're continuing from a previous step
   const continueParam = searchParams.get('continue');
@@ -84,6 +96,24 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
     }
   }, [hasProcessedContinue, isInSigningProcess, isWalletConnected, walletPublicKey, program]);
 
+  const fetchOnchainHash = async (pda: string) => {
+    if (!program) return;
+    
+    setIsHashLoading(true);
+    try {
+      const proposalPubkey = new PublicKey(pda);
+      const onchainProposal = await program.account.proposal.fetch(proposalPubkey);
+      const hashBytes = onchainProposal.hash as number[];
+      const hashHex = Buffer.from(hashBytes).toString('hex');
+      setOnchainHash(hashHex);
+    } catch (err) {
+      console.error('Failed to fetch onchain hash:', err);
+      setOnchainHash(null);
+    } finally {
+      setIsHashLoading(false);
+    }
+  };
+
   const loadProposal = async (id: number) => {
     
     // Prevent multiple loads if we're already loading or in signing process
@@ -104,9 +134,11 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
       setHasLoadedProposal(true);
       
       if (data.pda) {
-        // Proposal is already finalized
+        // Proposal is already finalized - fetch onchain hash
         setCurrentState('draft');
         setIsDisabled(true);
+        setIsProposalFinalized(true);
+        await fetchOnchainHash(data.pda);
       } else {
         // Proposal exists but not finalized - check if we should auto-resume
         const continueParam = searchParams.get('continue');
@@ -338,18 +370,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
     }
   };
 
-  // Show loading while wallet protection is being checked
-  if (!isProtected) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // No wallet protection for finalized proposals - they are public
 
   if (currentState === 'loading') {
     return (
@@ -376,6 +397,125 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
     );
   }
 
+  // If proposal is finalized (has PDA), show the new layout
+  if (proposal.pda) {
+    const isTampered = onchainHash && proposal.hash !== onchainHash;
+    
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col xl:flex-row gap-8 xl:min-h-[calc(100vh-4rem)]">
+            {/* Main Body - takes remaining space */}
+            <div className="flex-1 flex flex-col xl:min-h-[calc(100vh-4rem)]">
+              {/* Proposal Name */}
+              <h1 className="text-3xl font-bold text-gray-900 flex-none mb-6">
+                {proposal.name}
+              </h1>
+
+              {/* Description - takes available space on xl, normal flow below */}
+              <div className="xl:flex-1 xl:overflow-y-auto xl:mb-6 mb-6">
+                {proposal.description ? (
+                  <MarkdownRenderer>{proposal.description}</MarkdownRenderer>
+                ) : (
+                  <p className="text-gray-500 italic">No description provided</p>
+                )}
+              </div>
+
+              {/* Choices - pushed to bottom on xl, normal flow below */}
+              <div className="xl:flex-none">
+                <div className="flex flex-col xl:flex-row gap-4">
+                  {proposal.choices.map((choice, index) => {
+                    const choiceLabel = String.fromCharCode(97 + index); // a, b, c, etc.
+                    return (
+                      <div
+                        key={index}
+                        className="flex items-center space-x-3 p-4 bg-white rounded-lg border border-gray-200 shadow-sm flex-1"
+                      >
+                        <span className="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-800 text-sm font-medium rounded-full flex items-center justify-center">
+                          {choiceLabel}.
+                        </span>
+                        <span className="text-gray-900">{choice}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Details Panel - fixed width on xl, full width below */}
+            <div className="xl:w-80 w-full">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full">
+                <h2 className="text-lg font-semibold text-gray-900 mb-6">Details</h2>
+                
+                <div className="space-y-4">
+                  {/* Author */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Author</label>
+                    <p className="text-gray-900">{proposal.author.username}</p>
+                  </div>
+
+                  {/* Fundings Account */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Fundings Account</label>
+                    <div className="flex items-center justify-between">
+                      <a
+                        href={`https://solscan.io/account/${proposal.payerPubkey}?cluster=devnet`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 underline font-mono text-sm"
+                      >
+                        {trimAddress(proposal.payerPubkey)}
+                      </a>
+                      <span className="text-sm text-gray-500">0 SOL</span>
+                    </div>
+                  </div>
+
+                  {/* Account (PDA) */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Account</label>
+                    <a
+                      href={`https://solscan.io/account/${proposal.pda}?cluster=devnet`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 underline font-mono text-sm block"
+                    >
+                      {trimAddress(proposal.pda)}
+                    </a>
+                  </div>
+
+                  {/* Hash */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Hash</label>
+                    <div className="space-y-2">
+                      {isHashLoading ? (
+                        <div className="flex items-center">
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-2"></div>
+                          <span className="text-sm text-gray-500">Loading...</span>
+                        </div>
+                      ) : onchainHash ? (
+                        <div>
+                          <p className={`font-mono text-sm break-all ${isTampered ? 'text-red-500' : 'text-gray-900'}`}>
+                            {onchainHash}
+                          </p>
+                          {isTampered && (
+                            <p className="text-red-500 text-sm font-medium">TAMPERED</p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 text-sm">Failed to load</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Original layout for non-finalized proposals
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

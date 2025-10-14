@@ -6,7 +6,7 @@ import { isWalletConnectedAtom, walletPublicKeyAtom } from '@/lib/anchor';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 
-export function useWalletProtection(redirectPath?: string) {
+export function useWalletProtection(redirectPath?: string, disabled?: boolean) {
   const [user] = useAtom(userAtom);
   const [isWalletConnected] = useAtom(isWalletConnectedAtom);
   const [walletPublicKey] = useAtom(walletPublicKeyAtom);
@@ -16,6 +16,11 @@ export function useWalletProtection(redirectPath?: string) {
   useEffect(() => {
     // Reset redirect flag when dependencies change
     hasRedirected.current = false;
+    
+    // If disabled, don't perform any checks
+    if (disabled) {
+      return;
+    }
     
     // Get current URL if not provided
     const currentUrl = redirectPath || (typeof window !== 'undefined' ? window.location.href : '');
@@ -56,10 +61,10 @@ export function useWalletProtection(redirectPath?: string) {
       return;
     }
 
-  }, [user, isWalletConnected, walletPublicKey, redirectPath, router]);
+  }, [user, isWalletConnected, walletPublicKey, redirectPath, router, disabled]);
 
   return {
-    isProtected: user?.wallet_address && isWalletConnected && walletPublicKey?.toBase58() === user.wallet_address,
+    isProtected: disabled ? true : (user?.wallet_address && isWalletConnected && walletPublicKey?.toBase58() === user.wallet_address),
     user,
     isWalletConnected,
     walletPublicKey
