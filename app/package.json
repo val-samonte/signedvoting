@@ -11,6 +11,12 @@
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
     "@prisma/client": "^6.17.1",
+    "@solana/spl-token": "^0.4.14",
+    "@solana/wallet-adapter-base": "^0.9.27",
+    "@solana/wallet-adapter-react": "^0.15.39",
+    "@solana/wallet-adapter-react-ui": "^0.9.39",
+    "@solana/wallet-adapter-wallets": "^0.19.37",
+    "@solana/web3.js": "^1.98.4",
     "@types/bcryptjs": "^2.4.6",
     "@types/js-cookie": "^3.0.6",
     "bcryptjs": "^3.0.2",
@@ -20,6 +26,7 @@
     "prisma": "^6.17.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "tweetnacl": "^1.0.3",
     "zod": "^4.1.12"
   },
   "devDependencies": {

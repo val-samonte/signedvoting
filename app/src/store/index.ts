@@ -1,5 +1,6 @@
 import { atom } from 'jotai'
 import { getSession, setSession, clearSession, type SessionUser } from '@/lib/session'
+import { PublicKey } from '@solana/web3.js'
 
 // User state - initialize as null, will be restored on client side
 export const userAtom = atom<{
@@ -13,6 +14,11 @@ export const isAuthenticatedAtom = atom((get) => get(userAtom) !== null)
 
 // UI state
 export const sidebarOpenAtom = atom(false)
+
+// Wallet state
+export const connectedWalletAtom = atom<PublicKey | null>(null)
+export const walletBalanceAtom = atom<number | null>(null)
+export const isWalletConnectingAtom = atom(false)
 
 // Session management actions
 export const loginAtom = atom(
@@ -28,5 +34,13 @@ export const logoutAtom = atom(
   (get, set) => {
     set(userAtom, null)
     clearSession()
+  }
+)
+
+export const updateUserAtom = atom(
+  null,
+  (get, set, updatedUser: SessionUser) => {
+    set(userAtom, updatedUser)
+    setSession(updatedUser)
   }
 )
