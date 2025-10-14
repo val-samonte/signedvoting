@@ -24,7 +24,7 @@ type ProposalData = {
   };
 };
 
-type ProposalState = 'loading' | 'onchain' | 'finalizing' | 'completed' | 'error';
+type ProposalState = 'loading' | 'signing' | 'finalizing' | 'completed' | 'error';
 
 export default function ProposalDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -38,6 +38,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   const [isDisabled, setIsDisabled] = useState(false);
   const [proposalId, setProposalId] = useState<number | null>(null);
   const [hasProcessedContinue, setHasProcessedContinue] = useState(false);
+  const [userCancelledTx, setUserCancelledTx] = useState(false);
 
   // Check if we're continuing from a previous step
   const continueParam = searchParams.get('continue');
@@ -61,27 +62,19 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
     loadParams();
   }, [params]);
 
-  // Handle continue parameter separately
+  // Listen for wallet connection when ?continue is processed
   useEffect(() => {
-    const continueParam = searchParams.get('continue');
-    const urlHasContinue = window.location.href.includes('continue');
-    
-    if ((continueParam || urlHasContinue) && !hasProcessedContinue && proposal) {
-      console.log('Auto-resuming onchain creation process');
-      // Remove the continue param from URL
+    if (hasProcessedContinue && currentState === 'signing' && isWalletConnected && walletPublicKey && program) {
+      console.log('Wallet connected, proceeding with transaction');
+      // Remove ?continue from URL
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.delete('continue');
       window.history.replaceState({}, '', newUrl.toString());
       
-      // Automatically start the onchain creation process
-      setCurrentState('onchain');
-      setIsDisabled(true);
-      setHasProcessedContinue(true);
-      
-      // Automatically call the onchain creation function
+      // Call handleOnchainCreation
       handleOnchainCreation();
     }
-  }, [searchParams, hasProcessedContinue, proposal]);
+  }, [hasProcessedContinue, currentState, isWalletConnected, walletPublicKey, program]);
 
   const loadProposal = async (id: number) => {
     try {
@@ -100,9 +93,20 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
         setCurrentState('completed');
         setIsDisabled(true);
       } else {
-        // Proposal exists but not finalized - show as read-only
-        setCurrentState('completed');
-        setIsDisabled(true);
+        // Proposal exists but not finalized - check if we should auto-resume
+        const continueParam = searchParams.get('continue');
+        const urlHasContinue = window.location.href.includes('continue');
+        
+        if (continueParam || urlHasContinue) {
+          // Auto-resume with ?continue
+          setCurrentState('signing');
+          setIsDisabled(true);
+          setHasProcessedContinue(true);
+        } else {
+          // Show as read-only with Continue button
+          setCurrentState('completed');
+          setIsDisabled(true);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load proposal');
@@ -116,8 +120,9 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
       return;
     }
 
-    setCurrentState('onchain');
+    setCurrentState('signing');
     setError(null);
+    setUserCancelledTx(false); // Reset cancellation flag
 
     try {
       // Verify wallet address matches
@@ -144,8 +149,23 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
       setCurrentState('finalizing');
       await handleFinalization();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create onchain proposal');
-      setCurrentState('error');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create onchain proposal';
+      
+      // Check if user cancelled the transaction
+      const isUserCancelled = errorMessage.includes('User rejected') || 
+                             errorMessage.includes('User cancelled') ||
+                             errorMessage.includes('User declined') ||
+                             errorMessage.includes('cancelled') ||
+                             errorMessage.includes('rejected');
+      
+      if (isUserCancelled) {
+        setUserCancelledTx(true);
+        setCurrentState('completed'); // Go back to completed state to show yellow card
+        setError(null); // Clear any error message
+      } else {
+        setError(errorMessage);
+        setCurrentState('error');
+      }
     }
   };
 
@@ -179,6 +199,15 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   };
 
   const renderStateMessage = () => {
+    // If proposal is finalized (has PDA), don't show any status card
+    if (proposal?.pda) {
+      return null;
+    }
+
+    // Check if ?continue is present in URL
+    const continueParam = searchParams.get('continue');
+    const hasContinueParam = continueParam !== null;
+
     switch (currentState) {
       case 'loading':
         return (
@@ -189,32 +218,30 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
             </div>
           </div>
         );
-      case 'onchain':
-        // Only show Continue button if we're not auto-resuming (no ?continue param)
-        const showContinueButton = !hasProcessedContinue;
-        return (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center justify-between">
+      
+      case 'signing':
+        // Show blue card when user is signing transaction (Step 2)
+        // Check if wallet is connected to show appropriate message
+        if (!isWalletConnected) {
+          return (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <div className="flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600 mr-3"></div>
-                <span className="text-yellow-800">
-                  {showContinueButton 
-                    ? "Ready to create proposal on blockchain..." 
-                    : "Creating proposal on blockchain..."
-                  }
-                </span>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
+                <span className="text-blue-800">Waiting for wallet connection...</span>
               </div>
-              {showContinueButton && (
-                <button
-                  onClick={handleOnchainCreation}
-                  className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
-                >
-                  Continue
-                </button>
-              )}
+            </div>
+          );
+        }
+        
+        return (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
+              <span className="text-blue-800">Proposal is pending, awaiting to sign transaction</span>
             </div>
           </div>
         );
+      
       case 'finalizing':
         return (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
@@ -224,15 +251,29 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
             </div>
           </div>
         );
+      
       case 'completed':
-        return proposal?.pda ? (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center">
-              <div className="w-4 h-4 bg-green-600 rounded-full mr-3"></div>
-              <span className="text-green-800">Proposal created successfully!</span>
+        // Always show yellow card with Continue button when in completed state
+        return (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="w-4 h-4 bg-yellow-600 rounded-full mr-3"></div>
+                <span className="text-yellow-800">Ready to create the blockchain account...</span>
+              </div>
+              <button
+                onClick={() => {
+                  setUserCancelledTx(false);
+                  handleOnchainCreation();
+                }}
+                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
+              >
+                Continue
+              </button>
             </div>
           </div>
-        ) : null;
+        );
+      
       case 'error':
         return (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
@@ -243,7 +284,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
               </div>
               <button
                 onClick={() => {
-                  setCurrentState('onchain');
+                  setCurrentState('signing');
                   setError(null);
                 }}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
@@ -253,6 +294,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
             </div>
           </div>
         );
+      
       default:
         return null;
     }
