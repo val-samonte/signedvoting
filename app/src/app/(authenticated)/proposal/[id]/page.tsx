@@ -13,7 +13,7 @@ import { userAtom } from '@/store';
 import { PublicKey } from '@solana/web3.js';
 import { PauseIcon } from '@phosphor-icons/react';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
-import { trimAddress } from '@/lib/utils';
+import { trimAddress, computeProposalHash } from '@/lib/utils';
 
 type ProposalData = {
   id: number;
@@ -51,6 +51,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   const [isInSigningProcess, setIsInSigningProcess] = useState(false);
   const [hasLoadedProposal, setHasLoadedProposal] = useState(false);
   const [onchainHash, setOnchainHash] = useState<string | null>(null);
+  const [computedHash, setComputedHash] = useState<string | null>(null);
   const [isHashLoading, setIsHashLoading] = useState(false);
   const [isProposalFinalized, setIsProposalFinalized] = useState(false);
   const isLoadingRef = useRef(false);
@@ -96,6 +97,16 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
     }
   }, [hasProcessedContinue, isInSigningProcess, isWalletConnected, walletPublicKey, program]);
 
+  const computeHashFromProposal = async (proposal: ProposalData) => {
+    try {
+      const hash = await computeProposalHash(proposal.name, proposal.description, proposal.choices);
+      setComputedHash(hash);
+    } catch (err) {
+      console.error('Failed to compute hash:', err);
+      setComputedHash(null);
+    }
+  };
+
   const fetchOnchainHash = async (pda: string) => {
     if (!program) return;
     
@@ -132,6 +143,9 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
       const data = await response.json();
       setProposal(data);
       setHasLoadedProposal(true);
+      
+      // Compute hash from proposal data
+      await computeHashFromProposal(data);
       
       if (data.pda) {
         // Proposal is already finalized - fetch onchain hash
@@ -182,7 +196,11 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
       }
       
       // Call the anchor program to create the proposal onchain
-      const hashBytes = Buffer.from(proposal.hash, 'hex');
+      // Use computed hash instead of database hash
+      if (!computedHash) {
+        throw new Error('Hash computation failed');
+      }
+      const hashBytes = Buffer.from(computedHash, 'hex');
       const uri = `/proposal/${proposal.id}`;
       
       // Create the transaction
@@ -399,7 +417,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
 
   // If proposal is finalized (has PDA), show the new layout
   if (proposal.pda) {
-    const isTampered = onchainHash && proposal.hash !== onchainHash;
+    const isTampered = onchainHash && computedHash && computedHash !== onchainHash;
     
     return (
       <div className="min-h-screen bg-gray-50 py-8">
@@ -454,9 +472,9 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                     <p className="text-gray-900">{proposal.author.username}</p>
                   </div>
 
-                  {/* Fundings Account */}
+                  {/* Funds Account */}
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Fundings Account</label>
+                    <label className="text-sm font-medium text-gray-500">Funds Account</label>
                     <div className="flex items-center justify-between">
                       <a
                         href={`https://solscan.io/account/${proposal.payerPubkey}?cluster=devnet`}
@@ -472,7 +490,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
 
                   {/* Account (PDA) */}
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Account</label>
+                    <label className="text-sm font-medium text-gray-500">Proposal Onchain Account</label>
                     <a
                       href={`https://solscan.io/account/${proposal.pda}?cluster=devnet`}
                       target="_blank"
@@ -492,7 +510,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                           <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-2"></div>
                           <span className="text-sm text-gray-500">Loading...</span>
                         </div>
-                      ) : onchainHash ? (
+                      ) : onchainHash && computedHash ? (
                         <div>
                           <p className={`font-mono text-sm break-all ${isTampered ? 'text-red-500' : 'text-gray-900'}`}>
                             {onchainHash}
