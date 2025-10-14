@@ -12,6 +12,8 @@ import {
   proposalFormErrorsAtom,
   isProposalFormValidAtom,
   validateProposalFormAtom,
+  validateNameAtom,
+  validateChoiceAtom,
   resetProposalFormAtom
 } from '@/store/proposal';
 import { useEffect } from 'react';
@@ -42,6 +44,8 @@ export function ProposalForm({
   const errors = useAtomValue(proposalFormErrorsAtom);
   const isValid = useAtomValue(isProposalFormValidAtom);
   const validateForm = useSetAtom(validateProposalFormAtom);
+  const validateName = useSetAtom(validateNameAtom);
+  const validateChoice = useSetAtom(validateChoiceAtom);
   const resetForm = useSetAtom(resetProposalFormAtom);
 
   // Initialize form with initial data
@@ -58,8 +62,8 @@ export function ProposalForm({
 
   const handleNameBlur = () => {
     if (disabled) return;
-    // Trigger validation to show/hide errors only on blur
-    validateForm();
+    // Trigger validation for name field only
+    validateName();
   };
 
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -72,10 +76,10 @@ export function ProposalForm({
     setChoice({ index, value });
   };
 
-  const handleChoiceBlur = () => {
+  const handleChoiceBlur = (index: number) => {
     if (disabled) return;
-    // Trigger validation to show/hide errors only on blur
-    validateForm();
+    // Trigger validation for specific choice field only
+    validateChoice(index);
   };
 
   const handleAddChoice = () => {
@@ -171,7 +175,7 @@ export function ProposalForm({
                 type="text"
                 value={choice}
                 onChange={(e) => handleChoiceChange(index, e.target.value)}
-                onBlur={handleChoiceBlur}
+                onBlur={() => handleChoiceBlur(index)}
                 disabled={disabled}
                 className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                   errors[`choices.${index}`] ? 'border-red-300' : 'border-gray-300'

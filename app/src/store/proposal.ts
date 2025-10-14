@@ -55,6 +55,54 @@ export const validateProposalFormAtom = atom(
   }
 );
 
+// Field-specific validation atoms
+export const validateNameAtom = atom(
+  null,
+  (get, set) => {
+    const formData = get(proposalFormDataAtom);
+    const currentErrors = get(proposalFormErrorsAtom);
+    const newErrors = { ...currentErrors };
+    
+    // Validate name
+    if (formData.name.length < 6) {
+      newErrors.name = 'Name must be at least 6 characters long';
+    } else if (formData.name.length > 64) {
+      newErrors.name = 'Name must be at most 64 characters long';
+    } else {
+      delete newErrors.name; // Clear error if valid
+    }
+    
+    set(proposalFormErrorsAtom, newErrors);
+  }
+);
+
+export const validateChoiceAtom = atom(
+  null,
+  (get, set, index: number) => {
+    const formData = get(proposalFormDataAtom);
+    const currentErrors = get(proposalFormErrorsAtom);
+    const newErrors = { ...currentErrors };
+    
+    // Validate specific choice
+    const choice = formData.choices[index];
+    if (choice.trim() === '') {
+      newErrors[`choices.${index}`] = 'Choice cannot be empty';
+    } else {
+      delete newErrors[`choices.${index}`]; // Clear error if valid
+    }
+    
+    // Also validate overall choices count
+    const validChoices = formData.choices.filter(c => c.trim() !== '');
+    if (validChoices.length < 2) {
+      newErrors.choices = 'At least 2 choices are required';
+    } else {
+      delete newErrors.choices; // Clear error if valid
+    }
+    
+    set(proposalFormErrorsAtom, newErrors);
+  }
+);
+
 // Helper atoms for individual fields
 export const proposalNameAtom = atom(
   (get) => get(proposalFormDataAtom).name,

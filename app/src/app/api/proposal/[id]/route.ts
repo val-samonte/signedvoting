@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from '@/lib/session';
+import { Keypair } from '@solana/web3.js';
 
 export async function GET(
   request: NextRequest,
@@ -35,9 +36,9 @@ export async function GET(
     }
 
     // Parse the payer keypair to get the public key
-    // The payer is stored as base58 encoded keypair
-    const payerKeypair = JSON.parse(proposal.payer);
-    const payerPubkey = payerKeypair.slice(32, 64); // Extract public key from keypair
+    // The payer is stored as base58 encoded keypair (secretKey.toString())
+    const payerKeypair = Keypair.fromSecretKey(Buffer.from(proposal.payer, 'base64'));
+    const payerPubkeyBase58 = payerKeypair.publicKey.toBase58();
 
     return NextResponse.json({
       id: proposal.id,
