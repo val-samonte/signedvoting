@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from '@/lib/session';
 import { PublicKey } from '@solana/web3.js';
-import { connection } from '@/lib/anchor';
+import { connection, PROGRAM_ID } from '@/lib/anchor';
 
 export async function POST(
   request: NextRequest,
@@ -42,14 +42,18 @@ export async function POST(
 
     // Reconstruct the PDA address
     // Seeds: [user.wallet_address, hash of the proposal]
-    const authorPubkey = new PublicKey(proposal.author.wallet_address!);
+    if (!proposal.author.wallet_address) {
+      return NextResponse.json({ error: 'Author wallet address not found' }, { status: 400 });
+    }
+    
+    const authorPubkey = new PublicKey(proposal.author.wallet_address);
     const hashBytes = Buffer.from(proposal.hash, 'hex');
     
     // We need the program ID and discriminator to find the PDA
     // For now, we'll try to derive it and then verify the account exists
     const [pdaAddress] = PublicKey.findProgramAddressSync(
       [authorPubkey.toBuffer(), hashBytes],
-      new PublicKey(process.env.NEXT_PUBLIC_PROGRAM_ID!) // You'll need to set this env var
+      PROGRAM_ID
     );
 
     try {
@@ -88,9 +92,17 @@ export async function POST(
         pda: pdaAddress.toBase58(),
       });
       } catch (error) {
-        return NextResponse.json({ error: 'Failed to verify onchain proposal' }, { status: 500 });
+        console.error('Failed to verify onchain proposal:', error);
+        return NextResponse.json({ 
+          error: 'Failed to verify onchain proposal',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }, { status: 500 });
       }
   } catch (error) {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Internal server error in finalize route:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }
