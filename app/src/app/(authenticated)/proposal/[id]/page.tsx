@@ -37,9 +37,13 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   const [error, setError] = useState<string | null>(null);
   const [isDisabled, setIsDisabled] = useState(false);
   const [proposalId, setProposalId] = useState<number | null>(null);
+  const [hasProcessedContinue, setHasProcessedContinue] = useState(false);
 
   // Check if we're continuing from a previous step
   const continueParam = searchParams.get('continue');
+  console.log('URL:', window.location.href);
+  console.log('Search params:', searchParams.toString());
+  console.log('Continue param from searchParams:', continueParam);
 
   useEffect(() => {
     const loadParams = async () => {
@@ -57,6 +61,28 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
     loadParams();
   }, [params]);
 
+  // Handle continue parameter separately
+  useEffect(() => {
+    const continueParam = searchParams.get('continue');
+    const urlHasContinue = window.location.href.includes('continue');
+    
+    if ((continueParam || urlHasContinue) && !hasProcessedContinue && proposal) {
+      console.log('Auto-resuming onchain creation process');
+      // Remove the continue param from URL
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('continue');
+      window.history.replaceState({}, '', newUrl.toString());
+      
+      // Automatically start the onchain creation process
+      setCurrentState('onchain');
+      setIsDisabled(true);
+      setHasProcessedContinue(true);
+      
+      // Automatically call the onchain creation function
+      handleOnchainCreation();
+    }
+  }, [searchParams, hasProcessedContinue, proposal]);
+
   const loadProposal = async (id: number) => {
     try {
       const response = await fetch(`/api/proposal/${id}`);
@@ -67,16 +93,9 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
       const data = await response.json();
       setProposal(data);
       
-      if (continueParam) {
-        // Remove the continue param from URL
-        const newUrl = new URL(window.location.href);
-        newUrl.searchParams.delete('continue');
-        window.history.replaceState({}, '', newUrl.toString());
-        
-        // Continue from onchain step
-        setCurrentState('onchain');
-        setIsDisabled(true);
-      } else if (data.pda) {
+      console.log('Proposal data loaded:', data);
+      
+      if (data.pda) {
         // Proposal is already finalized
         setCurrentState('completed');
         setIsDisabled(true);
@@ -171,19 +190,28 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
           </div>
         );
       case 'onchain':
+        // Only show Continue button if we're not auto-resuming (no ?continue param)
+        const showContinueButton = !hasProcessedContinue;
         return (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600 mr-3"></div>
-                <span className="text-yellow-800">Ready to create proposal on blockchain...</span>
+                <span className="text-yellow-800">
+                  {showContinueButton 
+                    ? "Ready to create proposal on blockchain..." 
+                    : "Creating proposal on blockchain..."
+                  }
+                </span>
               </div>
-              <button
-                onClick={handleOnchainCreation}
-                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
-              >
-                Continue
-              </button>
+              {showContinueButton && (
+                <button
+                  onClick={handleOnchainCreation}
+                  className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
+                >
+                  Continue
+                </button>
+              )}
             </div>
           </div>
         );

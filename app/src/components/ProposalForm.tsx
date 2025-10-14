@@ -16,7 +16,7 @@ import {
   validateChoiceAtom,
   resetProposalFormAtom
 } from '@/store/proposal';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface ProposalFormProps {
   initialData?: {
@@ -49,9 +49,12 @@ export function ProposalForm({
   const resetForm = useSetAtom(resetProposalFormAtom);
 
   // Initialize form with initial data
+  const hasInitialized = useRef(false);
+  
   useEffect(() => {
-    if (initialData) {
+    if (initialData && !hasInitialized.current) {
       resetForm(initialData);
+      hasInitialized.current = true;
     }
   }, [initialData, resetForm]);
 

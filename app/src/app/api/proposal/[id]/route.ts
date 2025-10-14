@@ -36,9 +36,16 @@ export async function GET(
     }
 
     // Parse the payer keypair to get the public key
-    // The payer is stored as base58 encoded keypair (secretKey.toString())
-    const payerKeypair = Keypair.fromSecretKey(Buffer.from(proposal.payer, 'base64'));
-    const payerPubkeyBase58 = payerKeypair.publicKey.toBase58();
+    // The payer is stored as base64 encoded keypair
+    let payerPubkeyBase58: string;
+    try {
+      const payerKeypair = Keypair.fromSecretKey(Buffer.from(proposal.payer, 'base64'));
+      payerPubkeyBase58 = payerKeypair.publicKey.toBase58();
+    } catch (error) {
+      console.error('Error parsing payer keypair:', error);
+      // Fallback: return a placeholder or handle the error
+      payerPubkeyBase58 = 'Invalid keypair';
+    }
 
     return NextResponse.json({
       id: proposal.id,
@@ -46,7 +53,7 @@ export async function GET(
       description: proposal.description,
       choices: JSON.parse(proposal.choices),
       hash: proposal.hash,
-      payerPubkey: Buffer.from(payerPubkey).toString('base64'), // Convert to base64 for easier handling
+      payerPubkey: payerPubkeyBase58,
       pda: proposal.pda,
       author: {
         id: proposal.author.id,

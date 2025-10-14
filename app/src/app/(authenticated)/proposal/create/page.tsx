@@ -117,6 +117,7 @@ export default function CreateProposalPage() {
       }
 
       // Redirect to proposal page with continue param
+      console.log('Redirecting to:', `/proposal/${result.proposal.id}?continue`);
       router.push(`/proposal/${result.proposal.id}?continue`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create proposal');
