@@ -7,7 +7,7 @@ pub mod errors;
 
 pub use instructions::*;
 
-declare_id!("EF5j7v44KDGfagMWfB9bNDyyvuVjWNwhCc5cdJFkYKdv");
+declare_id!("3iUNbQUnm5EfJVLvXtoU3o8h3JXuBeEQ8zL6tkD9n7zb");
 
 #[program]
 pub mod signedvoting {

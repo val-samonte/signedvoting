@@ -6,13 +6,13 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-signedvoting = "EF5j7v44KDGfagMWfB9bNDyyvuVjWNwhCc5cdJFkYKdv"
+signedvoting = "3iUNbQUnm5EfJVLvXtoU3o8h3JXuBeEQ8zL6tkD9n7zb"
 
 [programs.devnet]
-signedvoting = "EF5j7v44KDGfagMWfB9bNDyyvuVjWNwhCc5cdJFkYKdv"
+signedvoting = "3iUNbQUnm5EfJVLvXtoU3o8h3JXuBeEQ8zL6tkD9n7zb"
 
 [programs.mainnet]
-signedvoting = "EF5j7v44KDGfagMWfB9bNDyyvuVjWNwhCc5cdJFkYKdv"
+signedvoting = "3iUNbQUnm5EfJVLvXtoU3o8h3JXuBeEQ8zL6tkD9n7zb"
 
 [registry]
 url = "https://api.apr.dev"
