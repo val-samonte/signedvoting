@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ProposalForm } from '@/components/ProposalForm';
 import { ProposalPreview } from '@/components/ProposalPreview';
@@ -24,7 +24,7 @@ type ProposalData = {
   };
 };
 
-type ProposalState = 'loading' | 'signing' | 'finalizing' | 'completed' | 'error';
+type ProposalState = 'loading' | 'signing' | 'finalizing' | 'draft' | 'error';
 
 export default function ProposalDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -39,12 +39,12 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   const [proposalId, setProposalId] = useState<number | null>(null);
   const [hasProcessedContinue, setHasProcessedContinue] = useState(false);
   const [userCancelledTx, setUserCancelledTx] = useState(false);
+  const [isInSigningProcess, setIsInSigningProcess] = useState(false);
+  const [hasLoadedProposal, setHasLoadedProposal] = useState(false);
+  const isLoadingRef = useRef(false);
 
   // Check if we're continuing from a previous step
   const continueParam = searchParams.get('continue');
-  console.log('URL:', window.location.href);
-  console.log('Search params:', searchParams.toString());
-  console.log('Continue param from searchParams:', continueParam);
 
   useEffect(() => {
     const loadParams = async () => {
@@ -56,16 +56,21 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
         return;
       }
       setProposalId(id);
-      loadProposal(id);
+      
+      // Don't load proposal if we're already in signing process
+      if (!isInSigningProcess) {
+        loadProposal(id);
+      } else {
+        console.log('STATE CHANGE: skipping loadProposal - already in signing process');
+      }
     };
     
     loadParams();
-  }, [params]);
+  }, [params, isInSigningProcess]);
 
   // Listen for wallet connection when ?continue is processed
   useEffect(() => {
-    if (hasProcessedContinue && currentState === 'signing' && isWalletConnected && walletPublicKey && program) {
-      console.log('Wallet connected, proceeding with transaction');
+    if (hasProcessedContinue && isInSigningProcess && isWalletConnected && walletPublicKey && program) {
       // Remove ?continue from URL
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.delete('continue');
@@ -74,9 +79,24 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
       // Call handleOnchainCreation
       handleOnchainCreation();
     }
-  }, [hasProcessedContinue, currentState, isWalletConnected, walletPublicKey, program]);
+  }, [hasProcessedContinue, isInSigningProcess, isWalletConnected, walletPublicKey, program]);
 
   const loadProposal = async (id: number) => {
+    console.log('STATE CHANGE: loadProposal called', JSON.stringify({
+      hasLoadedProposal,
+      isInSigningProcess,
+      currentState,
+      isLoadingRef: isLoadingRef.current
+    }, null, 2));
+    
+    // Prevent multiple loads if we're already loading or in signing process
+    if (isLoadingRef.current || (hasLoadedProposal && isInSigningProcess)) {
+      console.log('STATE CHANGE: skipping loadProposal - already loading or in signing process');
+      return;
+    }
+    
+    isLoadingRef.current = true;
+    
     try {
       const response = await fetch(`/api/proposal/${id}`);
       if (!response.ok) {
@@ -85,12 +105,11 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
       
       const data = await response.json();
       setProposal(data);
-      
-      console.log('Proposal data loaded:', data);
+      setHasLoadedProposal(true);
       
       if (data.pda) {
         // Proposal is already finalized
-        setCurrentState('completed');
+        setCurrentState('draft');
         setIsDisabled(true);
       } else {
         // Proposal exists but not finalized - check if we should auto-resume
@@ -99,18 +118,28 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
         
         if (continueParam || urlHasContinue) {
           // Auto-resume with ?continue
+          console.log('STATE CHANGE: ?continue detected, setting to signing');
           setCurrentState('signing');
           setIsDisabled(true);
           setHasProcessedContinue(true);
+          setIsInSigningProcess(true);
         } else {
           // Show as read-only with Continue button
-          setCurrentState('completed');
+          console.log('STATE CHANGE: no ?continue, setting to draft', {
+            hasLoadedProposal,
+            isInSigningProcess,
+            currentState,
+            stackTrace: new Error().stack
+          });
+          setCurrentState('draft');
           setIsDisabled(true);
         }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load proposal');
       setCurrentState('error');
+    } finally {
+      isLoadingRef.current = false;
     }
   };
 
@@ -120,9 +149,11 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
       return;
     }
 
+    console.log('STATE CHANGE: setting to signing');
     setCurrentState('signing');
     setError(null);
     setUserCancelledTx(false); // Reset cancellation flag
+    setIsInSigningProcess(true);
 
     try {
       // Verify wallet address matches
@@ -143,9 +174,9 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
         })
         .rpc({ commitment: 'confirmed' });
 
-      console.log('Transaction signature:', tx);
       
       // Move to finalization step
+      console.log('STATE CHANGE: setting to finalizing');
       setCurrentState('finalizing');
       await handleFinalization();
     } catch (err) {
@@ -159,10 +190,13 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                              errorMessage.includes('rejected');
       
       if (isUserCancelled) {
+        console.log('STATE CHANGE: user cancelled, setting to draft');
         setUserCancelledTx(true);
-        setCurrentState('completed'); // Go back to completed state to show yellow card
+        setCurrentState('draft'); // Go back to draft state to show yellow card
         setError(null); // Clear any error message
+        setIsInSigningProcess(false); // Reset signing process flag
       } else {
+        console.log('STATE CHANGE: error occurred, setting to error');
         setError(errorMessage);
         setCurrentState('error');
       }
@@ -186,7 +220,9 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
       
       // Update proposal with PDA
       setProposal(prev => prev ? { ...prev, pda: result.pda } : null);
-      setCurrentState('completed');
+      console.log('STATE CHANGE: finalization complete, setting to draft');
+      setCurrentState('draft');
+      setIsInSigningProcess(false); // Reset signing process flag
       
       // Redirect to the proposal page without continue param
       setTimeout(() => {
@@ -201,15 +237,27 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   const renderStateMessage = () => {
     // If proposal is finalized (has PDA), don't show any status card
     if (proposal?.pda) {
+      console.log('INFO PANEL: Hidden (proposal finalized)');
       return null;
     }
 
     // Check if ?continue is present in URL
     const continueParam = searchParams.get('continue');
     const hasContinueParam = continueParam !== null;
+    
+    console.log('INFO PANEL STATE:', JSON.stringify({
+      currentState,
+      hasContinueParam,
+      isWalletConnected,
+      isInSigningProcess,
+      hasProcessedContinue,
+      userCancelledTx,
+      proposalPda: proposal?.pda
+    }, null, 2));
 
     switch (currentState) {
       case 'loading':
+        console.log('INFO PANEL: Blue (loading)');
         return (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <div className="flex items-center">
@@ -223,6 +271,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
         // Show blue card when user is signing transaction (Step 2)
         // Check if wallet is connected to show appropriate message
         if (!isWalletConnected) {
+          console.log('INFO PANEL: Blue (waiting for wallet)');
           return (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <div className="flex items-center">
@@ -233,6 +282,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
           );
         }
         
+        console.log('INFO PANEL: Blue (signing transaction)');
         return (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <div className="flex items-center">
@@ -243,6 +293,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
         );
       
       case 'finalizing':
+        console.log('INFO PANEL: Green (finalizing)');
         return (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
             <div className="flex items-center">
@@ -252,8 +303,9 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
           </div>
         );
       
-      case 'completed':
-        // Always show yellow card with Continue button when in completed state
+      case 'draft':
+        // Always show yellow card with Continue button when in draft state
+        console.log('INFO PANEL: Yellow (draft - ready for Continue)');
         return (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
             <div className="flex items-center justify-between">
@@ -275,6 +327,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
         );
       
       case 'error':
+        console.log('INFO PANEL: Red (error)');
         return (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <div className="flex items-center justify-between">
