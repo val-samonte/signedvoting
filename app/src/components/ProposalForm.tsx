@@ -1,24 +1,27 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { z } from 'zod';
+import { useAtom } from 'jotai';
 import { PlusIcon, TrashIcon } from '@phosphor-icons/react';
-
-// Zod validation schema
-const proposalSchema = z.object({
-  name: z.string()
-    .min(6, 'Name must be at least 6 characters long')
-    .max(64, 'Name must be at most 64 characters long'),
-  description: z.string().optional(),
-  choices: z.array(z.string().min(1, 'Choice cannot be empty'))
-    .min(2, 'At least 2 choices are required')
-});
-
-type ProposalFormData = z.infer<typeof proposalSchema>;
+import { 
+  proposalNameAtom, 
+  proposalDescriptionAtom, 
+  proposalChoiceAtom,
+  addChoiceAtom,
+  removeChoiceAtom,
+  proposalChoicesAtom,
+  proposalFormErrorsAtom,
+  isProposalFormValidAtom,
+  resetProposalFormAtom
+} from '@/store/proposal';
+import { useEffect } from 'react';
 
 interface ProposalFormProps {
-  initialData?: ProposalFormData;
-  onSubmit?: (data: ProposalFormData) => void;
+  initialData?: {
+    name: string;
+    description: string;
+    choices: string[];
+  };
+  onSubmit?: (data: { name: string; description: string; choices: string[] }) => void;
   disabled?: boolean;
   showSubmit?: boolean;
 }
@@ -29,88 +32,57 @@ export function ProposalForm({
   disabled = false, 
   showSubmit = true 
 }: ProposalFormProps) {
-  const [formData, setFormData] = useState<ProposalFormData>(
-    initialData || {
-      name: '',
-      description: '',
-      choices: ['', '']
-    }
-  );
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [name, setName] = useAtom(proposalNameAtom);
+  const [description, setDescription] = useAtom(proposalDescriptionAtom);
+  const [choices] = useAtom(proposalChoicesAtom);
+  const [, setChoice] = useAtom(proposalChoiceAtom);
+  const [, addChoice] = useAtom(addChoiceAtom);
+  const [, removeChoice] = useAtom(removeChoiceAtom);
+  const [errors] = useAtom(proposalFormErrorsAtom);
+  const [isValid] = useAtom(isProposalFormValidAtom);
+  const [, resetForm] = useAtom(resetProposalFormAtom);
 
-  // Update form data when initialData changes
+  // Initialize form with initial data
   useEffect(() => {
     if (initialData) {
-      setFormData(initialData);
+      resetForm(initialData);
     }
-  }, [initialData]);
-
-  const validateForm = (): boolean => {
-    try {
-      proposalSchema.parse(formData);
-      setErrors({});
-      return true;
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const newErrors: Record<string, string> = {};
-        error.issues.forEach((err) => {
-          const path = err.path.join('.');
-          newErrors[path] = err.message;
-        });
-        setErrors(newErrors);
-      }
-      return false;
-    }
-  };
+  }, [initialData, resetForm]);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (disabled) return;
-    const value = e.target.value;
-    setFormData(prev => ({ ...prev, name: value }));
-    
-    // Clear error when user starts typing
-    if (errors.name) {
-      setErrors(prev => ({ ...prev, name: '' }));
-    }
+    setName(e.target.value);
   };
 
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (disabled) return;
-    setFormData(prev => ({ ...prev, description: e.target.value }));
+    setDescription(e.target.value);
   };
 
   const handleChoiceChange = (index: number, value: string) => {
     if (disabled) return;
-    const newChoices = [...formData.choices];
-    newChoices[index] = value;
-    setFormData(prev => ({ ...prev, choices: newChoices }));
-    
-    // Clear error when user starts typing
-    if (errors[`choices.${index}`]) {
-      setErrors(prev => ({ ...prev, [`choices.${index}`]: '' }));
-    }
+    setChoice({ index, value });
   };
 
-  const addChoice = () => {
+  const handleAddChoice = () => {
     if (disabled) return;
-    setFormData(prev => ({ ...prev, choices: [...prev.choices, ''] }));
+    addChoice();
   };
 
-  const removeChoice = (index: number) => {
+  const handleRemoveChoice = (index: number) => {
     if (disabled) return;
-    if (formData.choices.length > 2) {
-      const newChoices = formData.choices.filter((_, i) => i !== index);
-      setFormData(prev => ({ ...prev, choices: newChoices }));
-    }
+    removeChoice(index);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (disabled || !onSubmit) return;
+    if (disabled || !onSubmit || !isValid) return;
     
-    if (validateForm()) {
-      onSubmit(formData);
-    }
+    onSubmit({
+      name,
+      description,
+      choices: choices.filter(choice => choice.trim() !== ''),
+    });
   };
 
   const getChoiceLabel = (index: number) => {
@@ -127,7 +99,7 @@ export function ProposalForm({
         <input
           type="text"
           id="name"
-          value={formData.name}
+          value={name}
           onChange={handleNameChange}
           disabled={disabled}
           className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
@@ -140,7 +112,7 @@ export function ProposalForm({
           <p className="mt-1 text-sm text-red-600">{errors.name}</p>
         )}
         <p className="mt-1 text-xs text-gray-500">
-          {formData.name.length}/64 characters
+          {name.length}/64 characters
         </p>
       </div>
 
@@ -151,7 +123,7 @@ export function ProposalForm({
         </label>
         <textarea
           id="description"
-          value={formData.description}
+          value={description}
           onChange={handleDescriptionChange}
           disabled={disabled}
           rows={6}
@@ -171,7 +143,7 @@ export function ProposalForm({
           Choices *
         </label>
         <div className="space-y-3">
-          {formData.choices.map((choice, index) => (
+          {choices.map((choice, index) => (
             <div key={index} className="flex items-center space-x-3">
               <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-800 text-sm font-medium rounded-full flex items-center justify-center">
                 {getChoiceLabel(index)}.
@@ -186,10 +158,10 @@ export function ProposalForm({
                 } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 placeholder={`Choice ${getChoiceLabel(index).toUpperCase()}`}
               />
-              {formData.choices.length > 2 && !disabled && (
+              {choices.length > 2 && !disabled && (
                 <button
                   type="button"
-                  onClick={() => removeChoice(index)}
+                  onClick={() => handleRemoveChoice(index)}
                   className="flex-shrink-0 p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
                 >
                   <TrashIcon size={16} />
@@ -205,7 +177,7 @@ export function ProposalForm({
           {!disabled && (
             <button
               type="button"
-              onClick={addChoice}
+              onClick={handleAddChoice}
               className="flex items-center space-x-2 text-blue-600 hover:text-blue-800 text-sm font-medium"
             >
               <PlusIcon size={16} />
@@ -217,12 +189,12 @@ export function ProposalForm({
 
       {/* Submit Button */}
       {showSubmit && (
-        <div className="flex justify-end">
+        <div className="flex justify-end pt-6 border-t border-gray-200">
           <button
             type="submit"
-            disabled={disabled}
-            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-              disabled
+            disabled={disabled || !isValid}
+            className={`px-8 py-3 rounded-lg font-medium transition-colors ${
+              disabled || !isValid
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
             }`}

@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ProposalForm } from '@/components/ProposalForm';
 import { ProposalPreview } from '@/components/ProposalPreview';
+import { useAtom } from 'jotai';
+import { proposalFormDataAtom } from '@/store/proposal';
 import { useAnchor } from '@/hooks/useAnchor';
 import { PublicKey } from '@solana/web3.js';
 
@@ -20,11 +22,7 @@ export default function CreateProposalPage() {
   const searchParams = useSearchParams();
   const { isWalletConnected, walletPublicKey } = useAnchor();
   
-  const [proposalData, setProposalData] = useState<ProposalData>({
-    name: '',
-    description: '',
-    choices: ['', '']
-  });
+  const [formData] = useAtom(proposalFormDataAtom);
   
   const [currentState, setCurrentState] = useState<ProposalState>('form');
   const [proposalId, setProposalId] = useState<number | null>(null);
@@ -55,11 +53,6 @@ export default function CreateProposalPage() {
       }
       
       const data = await response.json();
-      setProposalData({
-        name: data.name,
-        description: data.description,
-        choices: data.choices,
-      });
       setProposalId(id);
       setCurrentState('onchain');
       setIsDisabled(true);
@@ -69,17 +62,12 @@ export default function CreateProposalPage() {
     }
   };
 
-  const handleFormSubmit = async (formData: { name: string; description?: string; choices: string[] }) => {
+  const handleFormSubmit = async (data: { name: string; description: string; choices: string[] }) => {
     if (!isWalletConnected || !walletPublicKey) {
       setError('Please connect your wallet first');
       return;
     }
 
-    setProposalData({
-      name: formData.name,
-      description: formData.description || '',
-      choices: formData.choices,
-    });
     setCurrentState('creating');
     setError(null);
 
@@ -91,9 +79,9 @@ export default function CreateProposalPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: formData.name,
-          description: formData.description || '',
-          choices: formData.choices,
+          name: data.name,
+          description: data.description,
+          choices: data.choices,
         }),
       });
 
@@ -269,24 +257,21 @@ export default function CreateProposalPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Form Column */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">Proposal Details</h2>
-              <ProposalForm
-                initialData={proposalData}
-                onSubmit={handleFormSubmit}
-                disabled={isDisabled}
-                showSubmit={currentState === 'form'}
-              />
-            </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">Proposal Details</h2>
+            <ProposalForm
+              onSubmit={handleFormSubmit}
+              disabled={isDisabled}
+              showSubmit={currentState === 'form'}
+            />
           </div>
 
           {/* Preview Column */}
           <div>
             <ProposalPreview
-              name={proposalData.name}
-              description={proposalData.description || ''}
-              choices={proposalData.choices.filter(choice => choice.trim() !== '')}
+              name={formData.name}
+              description={formData.description}
+              choices={formData.choices.filter(choice => choice.trim() !== '')}
             />
           </div>
         </div>

@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ProposalForm } from '@/components/ProposalForm';
 import { ProposalPreview } from '@/components/ProposalPreview';
+import { useAtom } from 'jotai';
+import { proposalFormDataAtom } from '@/store/proposal';
 import { useAnchor } from '@/hooks/useAnchor';
 import { PublicKey } from '@solana/web3.js';
 
@@ -29,6 +31,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   const searchParams = useSearchParams();
   const { isWalletConnected, walletPublicKey, program } = useAnchor();
   
+  const [formData] = useAtom(proposalFormDataAtom);
   const [proposal, setProposal] = useState<ProposalData | null>(null);
   const [currentState, setCurrentState] = useState<ProposalState>('loading');
   const [error, setError] = useState<string | null>(null);
@@ -266,27 +269,25 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Form Column */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">Proposal Details</h2>
-              <ProposalForm
-                initialData={{
-                  name: proposal.name,
-                  description: proposal.description,
-                  choices: proposal.choices,
-                }}
-                disabled={isDisabled}
-                showSubmit={false}
-              />
-            </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">Proposal Details</h2>
+            <ProposalForm
+              initialData={{
+                name: proposal.name,
+                description: proposal.description,
+                choices: proposal.choices,
+              }}
+              disabled={isDisabled}
+              showSubmit={false}
+            />
           </div>
 
           {/* Preview Column */}
           <div>
             <ProposalPreview
-              name={proposal.name}
-              description={proposal.description || ''}
-              choices={proposal.choices.filter(choice => choice.trim() !== '')}
+              name={formData.name || proposal.name}
+              description={formData.description || proposal.description}
+              choices={formData.choices.length > 0 ? formData.choices.filter(choice => choice.trim() !== '') : proposal.choices}
             />
           </div>
         </div>

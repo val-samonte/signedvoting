@@ -54,17 +54,6 @@ export function ProposalPreview({ name, description, choices }: ProposalPreviewP
             <p className="text-gray-500 italic">No choices provided</p>
           )}
         </div>
-
-      </div>
-
-      {/* Publish Button Placeholder */}
-      <div className="mt-8 pt-6 border-t border-gray-200">
-        <button
-          disabled
-          className="w-full bg-gray-300 text-gray-500 py-3 px-4 rounded-lg font-medium cursor-not-allowed"
-        >
-          Publish Now
-        </button>
       </div>
     </div>
   );
