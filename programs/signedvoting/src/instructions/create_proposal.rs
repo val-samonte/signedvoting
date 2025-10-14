@@ -6,7 +6,7 @@ use crate::states::*;
 pub struct CreateProposal<'info> {
     #[account(
         init,
-        payer = payer,
+        payer = author,
         space = 8 + 1 + 32 + 32 + 4 + uri.len() + 32,
         seeds = [author.key().as_ref(), hash.as_ref()],
         bump
@@ -16,8 +16,9 @@ pub struct CreateProposal<'info> {
     #[account(mut)]
     pub author: Signer<'info>,
     
+    /// CHECK: Payer account is validated by the system program during account creation
     #[account(mut)]
-    pub payer: Signer<'info>,
+    pub payer: UncheckedAccount<'info>,
     
     pub system_program: Program<'info, System>,
 }

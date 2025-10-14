@@ -12,6 +12,7 @@ describe("signedvoting", () => {
 
   // Test accounts
   let author: anchor.web3.Keypair;
+  let payer: anchor.web3.Keypair;
   let voter: anchor.web3.Keypair;
   let proposalPda: anchor.web3.PublicKey;
   let votePda: anchor.web3.PublicKey;
@@ -26,10 +27,12 @@ describe("signedvoting", () => {
   before(async () => {
     // Generate keypairs for testing
     author = anchor.web3.Keypair.generate();
+    payer = anchor.web3.Keypair.generate();
     voter = anchor.web3.Keypair.generate();
 
-    // Airdrop SOL only to author (proposal creator)
+    // Airdrop SOL to both author and payer
     await provider.connection.requestAirdrop(author.publicKey, 2 * anchor.web3.LAMPORTS_PER_SOL);
+    await provider.connection.requestAirdrop(payer.publicKey, 2 * anchor.web3.LAMPORTS_PER_SOL);
     // Note: voter has 0 SOL balance - they shouldn't need any SOL to vote
 
     // Wait for airdrop to confirm
@@ -53,9 +56,9 @@ describe("signedvoting", () => {
       .createProposal(testUri, Array.from(testHash))
       .accounts({
         author: author.publicKey,
-        payer: author.publicKey,
+        payer: payer.publicKey,
       })
-      .signers([author])
+      .signers([author]) // Only author needs to sign, payer does not
       .rpc();
 
     console.log("Create proposal transaction signature:", tx);
@@ -64,7 +67,7 @@ describe("signedvoting", () => {
     const proposalAccount = await program.account.proposal.fetch(proposalPda);
     
     expect(proposalAccount.author.toString()).to.equal(author.publicKey.toString());
-    expect(proposalAccount.payer.toString()).to.equal(author.publicKey.toString());
+    expect(proposalAccount.payer.toString()).to.equal(payer.publicKey.toString());
     expect(proposalAccount.uri).to.equal(testUri);
     expect(Array.from(proposalAccount.hash)).to.deep.equal(Array.from(testHash));
     expect(proposalAccount.bump).to.equal(proposalBump);
@@ -76,9 +79,9 @@ describe("signedvoting", () => {
       .accounts({
         proposal: proposalPda,
         voter: voter.publicKey,
-        payer: author.publicKey, // Must be the same as proposal payer
+        payer: payer.publicKey, // Must be the same as proposal payer
       })
-      .signers([voter, author])
+      .signers([voter, payer])
       .rpc();
 
     console.log("Vote transaction signature:", tx);

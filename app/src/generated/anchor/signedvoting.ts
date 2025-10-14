@@ -49,8 +49,7 @@ export type Signedvoting = {
         },
         {
           "name": "payer",
-          "writable": true,
-          "signer": true
+          "writable": true
         },
         {
           "name": "systemProgram",
