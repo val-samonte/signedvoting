@@ -259,7 +259,7 @@ export default function CreateProposalPage() {
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <Spinner className="h-8 w-8 text-blue-600 animate-spin" />
           </div>
         </div>
       </div>

@@ -386,7 +386,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
         return (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <div className="flex items-center">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
+              <Spinner className="h-4 w-4 text-blue-600 mr-3 animate-spin" />
               <span className="text-blue-800">Finalizing proposal...</span>
             </div>
           </div>
@@ -447,7 +447,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <Spinner className="h-8 w-8 text-blue-600 animate-spin" />
           </div>
         </div>
       </div>
@@ -539,7 +539,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                       <div className="flex items-center">
                         {isBalanceLoading || isRentLoading ? (
                           <div className="flex items-center">
-                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-1"></div>
+                            <Spinner className="h-3 w-3 text-blue-600 mr-1 animate-spin" />
                             <span className="text-sm text-gray-500">Loading...</span>
                           </div>
                         ) : fundsAccountBalance !== null && rentExemptMinimum !== null ? (
@@ -587,7 +587,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                     <div className="space-y-2">
                       {isHashLoading ? (
                         <div className="flex items-center">
-                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-2"></div>
+                          <Spinner className="h-3 w-3 text-blue-600 mr-2 animate-spin" />
                           <span className="text-sm text-gray-500">Loading...</span>
                         </div>
                       ) : onchainHash && computedHash ? (
