@@ -102,8 +102,7 @@ export type Signedvoting = {
           }
         },
         {
-          "name": "proposal",
-          "writable": true
+          "name": "proposal"
         },
         {
           "name": "voter",

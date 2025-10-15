@@ -13,7 +13,6 @@ pub struct VoteInstruction<'info> {
     )]
     pub vote: Account<'info, Vote>,
     
-    #[account(mut)]
     pub proposal: Account<'info, Proposal>,
     
     #[account(mut)]
