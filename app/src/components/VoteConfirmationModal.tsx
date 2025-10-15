@@ -6,7 +6,8 @@ import { FreehandSignature } from './FreehandSignature';
 import { VoteButton } from './VoteButton';
 import { 
   proposalSignatureAtomFamily,
-  processSignature
+  processSignature,
+  getKeypairFromUserAndBlob
 } from '@/store/proposal';
 import { getStroke } from 'perfect-freehand';
 
