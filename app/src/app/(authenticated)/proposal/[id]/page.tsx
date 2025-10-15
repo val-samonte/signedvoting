@@ -1,17 +1,18 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ProposalForm } from '@/components/ProposalForm';
 import { ProposalPreview } from '@/components/ProposalPreview';
 import { useAtom } from 'jotai';
 import { proposalFormDataAtom } from '@/store/proposal';
 import { useAnchor } from '@/hooks/useAnchor';
-import { isWalletConnectedAtom, walletPublicKeyAtom, userWalletAddressAtom } from '@/lib/anchor';
+import { userWalletAddressAtom } from '@/lib/anchor';
 import { userAtom } from '@/store';
 // import { useWalletProtection } from '@/hooks/useWalletProtection';
 import { PublicKey } from '@solana/web3.js';
-import { PauseIcon, SpinnerIcon, CheckCircleIcon } from '@phosphor-icons/react';
+import bs58 from 'bs58';
+import { PauseIcon, SpinnerIcon, CheckCircleIcon, WarningIcon } from '@phosphor-icons/react';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { LoadFundsModal } from '@/components/LoadFundsModal';
 import { VoteConfirmationModal } from '@/components/VoteConfirmationModal';
@@ -39,8 +40,6 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   const searchParams = useSearchParams();
   const { isWalletConnected, walletPublicKey, program, isUserWalletConnected } = useAnchor();
   const [user] = useAtom(userAtom);
-  const [isWalletConnectedState] = useAtom(isWalletConnectedAtom);
-  const [walletPublicKeyState] = useAtom(walletPublicKeyAtom);
   const [, setUserWalletAddress] = useAtom(userWalletAddressAtom);
   
   const [formData] = useAtom(proposalFormDataAtom);
@@ -50,7 +49,6 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   const [isDisabled, setIsDisabled] = useState(false);
   const [proposalId, setProposalId] = useState<number | null>(null);
   const [hasProcessedContinue, setHasProcessedContinue] = useState(false);
-  const [userCancelledTx, setUserCancelledTx] = useState(false);
   const [isInSigningProcess, setIsInSigningProcess] = useState(false);
   const [hasLoadedProposal, setHasLoadedProposal] = useState(false);
   const [onchainHash, setOnchainHash] = useState<string | null>(null);
@@ -65,7 +63,8 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   const [isVoteConfirmationModalOpen, setIsVoteConfirmationModalOpen] = useState(false);
   const [chosenChoice, setChosenChoice] = useState<{index: number, text: string, label: string} | null>(null);
   const [hasUserVoted, setHasUserVoted] = useState<boolean | null>(null);
-  const [isVoteStatusLoading, setIsVoteStatusLoading] = useState(false);
+  const [voteCounts, setVoteCounts] = useState<number[]>([]);
+  const [isVoteCountsLoading, setIsVoteCountsLoading] = useState(false);
   const isLoadingRef = useRef(false);
 
   // We'll handle wallet protection manually after loading the proposal
@@ -187,11 +186,12 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   };
 
   const handleVoteSuccess = async (transactionSignature: string) => {
-    // Refresh the funds account balance and vote status after successful voting
+    // Refresh the funds account balance, vote status, and vote counts after successful voting
     if (proposal && proposalId) {
       await Promise.all([
         fetchFundsAccountBalance(proposal.payerPubkey),
-        checkUserVoteStatus(proposalId)
+        checkUserVoteStatus(proposalId),
+        proposal.pda ? fetchVoteCounts(proposal.pda, proposal.choices.length) : Promise.resolve()
       ]);
     }
   };
@@ -199,7 +199,6 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   const checkUserVoteStatus = async (proposalId: number) => {
     if (!user) return;
     
-    setIsVoteStatusLoading(true);
     try {
       const response = await fetch(`/api/proposal/${proposalId}/vote-status`);
       if (response.ok) {
@@ -212,8 +211,53 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
     } catch (err) {
       console.error('Error checking vote status:', err);
       setHasUserVoted(false);
+    }
+  };
+
+  const fetchVoteCounts = async (proposalPda: string, choicesLength: number) => {
+    if (!program) return;
+    
+    setIsVoteCountsLoading(true);
+    try {
+      const proposalPubkey = new PublicKey(proposalPda);
+      const voteCounts: number[] = [];
+      
+      // Loop through each choice (0 to choicesLength - 1)
+      for (let choice = 0; choice < choicesLength; choice++) {
+        // Create memcmp filter for proposal_id (offset 41, since discriminator is 8 bytes + bump is 1 byte + voter is 32 bytes)
+        const proposalFilter = {
+          memcmp: {
+            offset: 41, // discriminator (8) + bump (1) + voter (32) = 41
+            bytes: proposalPubkey.toBase58(),
+          },
+        };
+        
+        // Create memcmp filter for choice (offset 73, since discriminator + bump + voter + proposal_id = 73)
+        const choiceFilter = {
+          memcmp: {
+            offset: 73, // discriminator (8) + bump (1) + voter (32) + proposal_id (32) = 73
+            bytes: bs58.encode(Buffer.from([choice])), // Convert choice to base58-encoded byte
+          },
+        };
+        
+        // Fetch accounts with both filters
+        const accounts = await program.provider.connection.getProgramAccounts(
+          program.programId,
+          {
+            filters: [proposalFilter, choiceFilter],
+            dataSlice: { offset: 0, length: 0 }, // Slice data to 0 to avoid expensive response
+          }
+        );
+        
+        voteCounts.push(accounts.length);
+      }
+      
+      setVoteCounts(voteCounts);
+    } catch (err) {
+      console.error('Failed to fetch vote counts:', err);
+      setVoteCounts([]);
     } finally {
-      setIsVoteStatusLoading(false);
+      setIsVoteCountsLoading(false);
     }
   };
 
@@ -237,6 +281,15 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   };
 
   const votingState = getVotingState();
+
+  // Calculate total votes and percentages using useMemo
+  const { totalVotes, votePercentages } = useMemo(() => {
+    const total = voteCounts.reduce((sum, count) => sum + count, 0);
+    const percentages = voteCounts.map(count => 
+      total > 0 ? Math.round((count / total) * 100) : 0
+    );
+    return { totalVotes: total, votePercentages: percentages };
+  }, [voteCounts]);
 
   const loadProposal = async (id: number) => {
     
@@ -268,11 +321,14 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
       ]);
       
       if (data.pda) {
-        // Proposal is already finalized - fetch onchain hash
+        // Proposal is already finalized - fetch onchain hash and vote counts
         setCurrentState('draft');
         setIsDisabled(true);
         setIsProposalFinalized(true);
-        await fetchOnchainHash(data.pda);
+        await Promise.all([
+          fetchOnchainHash(data.pda),
+          fetchVoteCounts(data.pda, data.choices.length)
+        ]);
       } else {
         // Proposal exists but not finalized - check if we should auto-resume
         const continueParam = searchParams.get('continue');
@@ -306,7 +362,6 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
 
     setCurrentState('signing');
     setError(null);
-    setUserCancelledTx(false); // Reset cancellation flag
     setIsInSigningProcess(true);
 
     try {
@@ -353,7 +408,6 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                                     (errorMessage.includes('custom program error: 0x0') && errorMessage.includes('already in use'));
       
       if (isUserCancelled) {
-        setUserCancelledTx(true);
         setCurrentState('draft'); // Go back to draft state to show yellow card
         setError(null); // Clear any error message
         setIsInSigningProcess(false); // Reset signing process flag
@@ -471,7 +525,6 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
               </div>
               <button
                 onClick={() => {
-                  setUserCancelledTx(false);
                   handleOnchainCreation();
                 }}
                 className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors cursor-pointer"
@@ -576,15 +629,18 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                     {proposal.choices.map((choice, index) => {
                       const choiceLabel = String.fromCharCode(97 + index); // a, b, c, etc.
                       const isDisabled = votingState === 'insufficient_funds' || votingState === 'already_voted';
+                      const voteCount = voteCounts[index] || 0;
+                      const votePercentage = votePercentages[index] || 0;
+                      const showPercentage = hasUserVoted === true && totalVotes > 0;
                       
                       return (
                         <div
                           key={index}
-                          className={`group flex items-center space-x-3 p-4 bg-white rounded-lg border border-gray-200 shadow-sm flex-1 transition-all duration-200 ${
+                          className={`group flex items-center justify-between p-4 rounded-lg border border-gray-200 shadow-sm flex-1 transition-all duration-200 relative overflow-hidden ${
                             votingState === 'enabled' 
                               ? 'cursor-pointer hover:bg-blue-600 hover:text-white hover:border-blue-600' 
                               : 'cursor-default'
-                          }`}
+                          } ${showPercentage ? '' : 'bg-white'}`}
                           onClick={() => {
                             if (votingState === 'enabled') {
                               const choiceLabel = String.fromCharCode(97 + index); // a, b, c, etc.
@@ -597,16 +653,42 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                             }
                           }}
                         >
-                          <span className={`flex-shrink-0 w-8 h-8 text-sm font-medium rounded-full flex items-center justify-center transition-colors duration-200 ${
-                            votingState === 'enabled' 
-                              ? 'bg-blue-100 text-blue-800 group-hover:bg-white group-hover:text-blue-600' 
-                              : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {choiceLabel}.
-                          </span>
-                          <span className={`text-gray-900 transition-colors duration-200 ${
-                            votingState === 'enabled' ? 'group-hover:text-white' : ''
-                          }`}>{choice}</span>
+                          {showPercentage && (
+                            <div 
+                              className="absolute top-0 bottom-0 left-0 bg-blue-100"
+                              style={{ width: `${votePercentage}%` }}
+                            />
+                          )}
+                          
+                          <div className="flex items-center space-x-3 w-full relative z-10">
+                            <span className={`flex-shrink-0 w-8 h-8 text-sm font-medium rounded-full flex items-center justify-center transition-colors duration-200 ${
+                              votingState === 'enabled' 
+                                ? 'bg-blue-100 text-blue-800 group-hover:bg-white group-hover:text-blue-600' 
+                                : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {choiceLabel}.
+                            </span>
+                            <span className={`text-gray-900 transition-colors duration-200 ${
+                              votingState === 'enabled' ? 'group-hover:text-white' : ''
+                            }`}>{choice}</span>
+                          </div>
+                          {hasUserVoted === true && (
+                            <div className={`flex items-center space-x-2 transition-colors duration-200 relative z-10 flex-shrink-0 ${
+                              votingState === 'enabled' ? 'group-hover:text-white' : ''
+                            }`}>
+                              {isVoteCountsLoading ? (
+                                <SpinnerIcon className="h-4 w-4 text-gray-400 animate-spin" />
+                              ) : (
+                                <>
+                                  <span className={`text-sm font-medium ${
+                                    votingState === 'enabled' ? 'text-gray-500 group-hover:text-white' : 'text-gray-500'
+                                  }`}>
+                                    {voteCount} vote{voteCount !== 1 ? 's' : ''}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -616,9 +698,12 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                   {votingState === 'insufficient_funds' && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-[1px] rounded-lg">
                       <div className="text-center">
-                        <p className="text-gray-600 text-sm font-medium mb-4">
-                          Proposal does not have enough funds to accept votes
-                        </p>
+                        <div className="flex items-center justify-center mb-4">
+                          <WarningIcon className="w-5 h-5 text-red-500 mr-2" />
+                          <p className="text-red-500 text-sm font-medium">
+                            Proposal does not have enough funds to accept votes
+                          </p>
+                        </div>
                         {isUserWalletConnected && (
                           <button
                             onClick={() => setIsLoadFundsModalOpen(true)}
@@ -751,11 +836,12 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
             onClose={async () => {
               setIsVoteConfirmationModalOpen(false);
               setChosenChoice(null);
-              // Refresh balance and vote status when modal closes
+              // Refresh balance, vote status, and vote counts when modal closes
               if (proposal) {
                 await Promise.all([
                   fetchFundsAccountBalance(proposal.payerPubkey),
-                  checkUserVoteStatus(proposalId)
+                  checkUserVoteStatus(proposalId),
+                  proposal.pda ? fetchVoteCounts(proposal.pda, proposal.choices.length) : Promise.resolve()
                 ]);
               }
             }}
