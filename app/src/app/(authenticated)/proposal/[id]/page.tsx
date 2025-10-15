@@ -14,6 +14,7 @@ import { PublicKey } from '@solana/web3.js';
 import { PauseIcon, Spinner } from '@phosphor-icons/react';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { LoadFundsModal } from '@/components/LoadFundsModal';
+import { VoteConfirmationModal } from '@/components/VoteConfirmationModal';
 import { trimAddress, computeProposalHash, calculateVoteAccountRentExemptMinimum } from '@/lib/utils';
 
 type ProposalData = {
@@ -60,6 +61,8 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   const [rentExemptMinimum, setRentExemptMinimum] = useState<number | null>(null);
   const [isRentLoading, setIsRentLoading] = useState(false);
   const [isLoadFundsModalOpen, setIsLoadFundsModalOpen] = useState(false);
+  const [isVoteConfirmationModalOpen, setIsVoteConfirmationModalOpen] = useState(false);
+  const [chosenChoice, setChosenChoice] = useState<{index: number, text: string, label: string} | null>(null);
   const [hasUserVoted, setHasUserVoted] = useState<boolean | null>(null);
   const [isVoteStatusLoading, setIsVoteStatusLoading] = useState(false);
   const isLoadingRef = useRef(false);
@@ -556,8 +559,13 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                           }`}
                           onClick={() => {
                             if (votingState === 'enabled') {
-                              // TODO: Handle vote selection in phase 2
-                              console.log('Vote selected:', index, choice);
+                              const choiceLabel = String.fromCharCode(97 + index); // a, b, c, etc.
+                              setChosenChoice({
+                                index,
+                                text: choice,
+                                label: choiceLabel
+                              });
+                              setIsVoteConfirmationModalOpen(true);
                             }
                           }}
                         >
@@ -713,6 +721,16 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
             onSuccess={handleLoadFundsSuccess}
           />
         )}
+
+        {/* Vote Confirmation Modal */}
+        <VoteConfirmationModal
+          isOpen={isVoteConfirmationModalOpen}
+          onClose={() => {
+            setIsVoteConfirmationModalOpen(false);
+            setChosenChoice(null);
+          }}
+          chosenChoice={chosenChoice}
+        />
       </div>
     );
   }
