@@ -4,7 +4,7 @@ import { useAtom } from 'jotai';
 import { userAtom, sidebarOpenAtom, logoutAtom } from '@/store';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { ListIcon, UserIcon, PlusIcon } from '@phosphor-icons/react';
+import { ListIcon, UserIcon, PlusIcon, CheckCircleIcon } from '@phosphor-icons/react';
 
 export function Navigation() {
   const [user] = useAtom(userAtom);
@@ -43,10 +43,14 @@ export function Navigation() {
     };
   }, [sidebarOpen]);
 
-  const navItems = [
+  const proposalItems = [
     { name: 'Recent Proposals', href: '/home', icon: ListIcon },
     { name: 'My Proposals', href: `/home?filter=${user?.id || ''}`, icon: UserIcon },
     { name: 'Create Proposal', href: '/proposal/create', icon: PlusIcon },
+  ];
+
+  const voteItems = [
+    { name: 'Verify My Vote', href: '/vote/verify', icon: CheckCircleIcon },
   ];
 
   return (
@@ -81,24 +85,48 @@ export function Navigation() {
           </div>
 
           {/* Navigation */}
-          <nav className="space-y-2 flex-1">
-            <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-              Proposals
+          <nav className="space-y-6 flex-1">
+            {/* Proposals Section */}
+            <div>
+              <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                Proposals
+              </div>
+              {proposalItems.map((item) => {
+                const IconComponent = item.icon;
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+                    onClick={() => setSidebarOpen(false)}
+                  >
+                    <IconComponent size={20} weight="regular" />
+                    <span>{item.name}</span>
+                  </Link>
+                );
+              })}
             </div>
-            {navItems.map((item) => {
-              const IconComponent = item.icon;
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <IconComponent size={20} weight="regular" />
-                  <span>{item.name}</span>
-                </Link>
-              );
-            })}
+
+            {/* Votes Section */}
+            <div>
+              <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                Votes
+              </div>
+              {voteItems.map((item) => {
+                const IconComponent = item.icon;
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+                    onClick={() => setSidebarOpen(false)}
+                  >
+                    <IconComponent size={20} weight="regular" />
+                    <span>{item.name}</span>
+                  </Link>
+                );
+              })}
+            </div>
           </nav>
 
           {/* User Section */}

@@ -89,7 +89,9 @@ export function MasonryGrid({ children, gap = 24, columns = 3 }: MasonryGridProp
     setItems(newItems);
   }, [children, gap, responsiveColumns]);
 
-  const containerHeight = Math.max(...columnHeights);
+  const containerHeight = columnHeights.length > 0 
+    ? Math.max(...columnHeights.filter(h => isFinite(h) && h >= 0)) 
+    : 0;
 
   return (
     <div
