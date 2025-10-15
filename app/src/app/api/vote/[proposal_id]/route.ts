@@ -52,9 +52,11 @@ export async function POST(
       // Retrieve payer keypair from proposal record
       const payerKeypair = Keypair.fromSecretKey(Buffer.from(proposal.payer, 'base64'));
 
-      // Sign the transaction with the payer keypair
+      // Ensure the fee payer is set correctly
       transaction.feePayer = payerKeypair.publicKey;
-      transaction.sign(payerKeypair);
+      
+      // Add the payer's signature to the partially signed transaction
+      transaction.partialSign(payerKeypair);
       
       // Send the transaction to the network
       transactionSignature = await connection.sendRawTransaction(transaction.serialize());

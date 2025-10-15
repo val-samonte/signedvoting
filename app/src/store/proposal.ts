@@ -256,31 +256,39 @@ export const getPngBlobFromSvg = async (svgString: string, proposalId: number): 
   canvas.width = 300;
   canvas.height = 200;
   
+  // Ensure consistent canvas rendering
+  ctx.fillStyle = 'white';
+  ctx.fillRect(0, 0, 300, 200);
+  ctx.fillStyle = 'black';
+  
   const img = new Image();
   const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
   const url = URL.createObjectURL(svgBlob);
   
   return new Promise<Blob | null>((resolve) => {
-    img.onload = () => {
+    img.onload = async () => {
       ctx.drawImage(img, 0, 0);
       
-      // Convert canvas to PNG blob
-      canvas.toBlob((blob) => {
-        if (blob) {
-          // Store base64 in localStorage as backup for recovery only
-          const storageKey = `${proposalId}_signature`;
-          if (typeof window !== 'undefined') {
-            const reader = new FileReader();
-            reader.onload = () => {
-              localStorage.setItem(storageKey, reader.result as string);
-            };
-            reader.readAsDataURL(blob);
-          }
+      // Convert canvas to PNG blob with deterministic method
+      try {
+        // Use toDataURL for more deterministic results
+        const dataURL = canvas.toDataURL('image/png');
+        const response = await fetch(dataURL);
+        const blob = await response.blob();
+        
+        // Store base64 in localStorage as backup for recovery only
+        const storageKey = `${proposalId}_signature`;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(storageKey, dataURL);
         }
         
-        URL.revokeObjectURL(url);
         resolve(blob);
-      }, 'image/png');
+      } catch (error) {
+        console.error('Error converting canvas to PNG:', error);
+        resolve(null);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
     };
     img.src = url;
   });
