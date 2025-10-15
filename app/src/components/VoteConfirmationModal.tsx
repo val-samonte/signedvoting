@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useAtom } from 'jotai';
 import { userAtom } from '@/store';
 import { FreehandSignature } from './FreehandSignature';
@@ -10,6 +10,10 @@ import {
   processSignature
 } from '@/store/proposal';
 import { getStroke } from 'perfect-freehand';
+import { useAnchor } from '@/hooks/useAnchor';
+import { calculateVoteCost } from '@/lib/utils';
+import { PublicKey } from '@solana/web3.js';
+import { SpinnerIcon } from '@phosphor-icons/react';
 
 interface VoteConfirmationModalProps {
   isOpen: boolean;
@@ -20,17 +24,54 @@ interface VoteConfirmationModalProps {
     label: string;
   } | null;
   proposalId: number;
+  proposalPda?: string;
+  payerPubkey?: string;
 }
 
 export function VoteConfirmationModal({ 
   isOpen, 
   onClose, 
   chosenChoice,
-  proposalId
+  proposalId,
+  proposalPda,
+  payerPubkey
 }: VoteConfirmationModalProps) {
   const [signatureStrokes, setSignatureStrokes] = useAtom(proposalSignatureAtomFamily(proposalId));
   const [user] = useAtom(userAtom);
+  const { program, walletPublicKey } = useAnchor();
+  const [voteCost, setVoteCost] = useState<{ rentExemptMinimum: number; transactionFee: number; totalCost: number } | null>(null);
+  const [isCostLoading, setIsCostLoading] = useState(false);
   const hasSignature = signatureStrokes.length > 0;
+
+  // Calculate vote cost when modal opens or choice changes
+  useEffect(() => {
+    const calculateCost = async () => {
+      if (!program || !walletPublicKey || !proposalPda || !payerPubkey || !chosenChoice) {
+        setVoteCost(null);
+        return;
+      }
+
+      setIsCostLoading(true);
+      try {
+        const cost = await calculateVoteCost(
+          program.provider.connection,
+          program,
+          new PublicKey(proposalPda),
+          walletPublicKey,
+          new PublicKey(payerPubkey),
+          chosenChoice.index
+        );
+        setVoteCost(cost);
+      } catch (error) {
+        console.error('Failed to calculate vote cost:', error);
+        setVoteCost(null);
+      } finally {
+        setIsCostLoading(false);
+      }
+    };
+
+    calculateCost();
+  }, [program, walletPublicKey, proposalPda, payerPubkey, chosenChoice]);
   
   
 
@@ -182,10 +223,34 @@ export function VoteConfirmationModal({
             Clear Signature
           </button>
 
+          {/* Vote Cost Information */}
+          {voteCost && (
+            <div className="bg-gray-50 p-3 rounded-md">
+              <div className="text-sm text-gray-600">
+                <div className="flex justify-between">
+                  <span>Vote account creation:</span>
+                  <span>{voteCost.rentExemptMinimum.toFixed(6)} SOL</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Transaction fee:</span>
+                  <span className="flex items-center">
+                    {isCostLoading ? (
+                      <SpinnerIcon className="h-3 w-3 mr-1 animate-spin" />
+                    ) : null}
+                    {voteCost.transactionFee.toFixed(6)} SOL
+                  </span>
+                </div>
+                <div className="flex justify-between font-medium text-gray-900 border-t border-gray-200 pt-2 mt-2">
+                  <span>Total cost:</span>
+                  <span>{voteCost.totalCost.toFixed(6)} SOL</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Vote Now Button */}
           <VoteButton 
-            disabled={!hasSignature}
+            disabled={!hasSignature || isCostLoading}
             onClick={handleVoteClick}
           />
         </div>

@@ -72,3 +72,107 @@ export async function calculateVoteAccountRentExemptMinimum(connection: Connecti
   const voteAccountSize = computeVoteAccountSize();
   return calculateRentExemptMinimum(connection, voteAccountSize);
 }
+
+/**
+ * Calculates the transaction fee for a given transaction
+ * @param connection - Solana connection instance
+ * @param transaction - The transaction to calculate fees for
+ * @returns Promise that resolves to the transaction fee in SOL
+ */
+export async function calculateTransactionFee(connection: Connection, transaction: { compileMessage(): any }): Promise<number> {
+  try {
+    // Get the fee for the transaction message
+    const fee = await connection.getFeeForMessage(transaction.compileMessage());
+    // Convert lamports to SOL, handle null case
+    return (fee.value || 5000) / 1e9;
+  } catch (error) {
+    console.error('Failed to calculate transaction fee:', error);
+    // Fallback to a reasonable default fee (5000 lamports = 0.000005 SOL)
+    return 0.000005;
+  }
+}
+
+/**
+ * Calculates the transaction fee for a simple SOL transfer
+ * @param connection - Solana connection instance
+ * @param fromPubkey - The sender's public key
+ * @param toPubkey - The recipient's public key
+ * @param lamports - The amount to transfer in lamports
+ * @returns Promise that resolves to the transaction fee in SOL
+ */
+export async function calculateTransferFee(
+  connection: Connection, 
+  fromPubkey: PublicKey, 
+  toPubkey: PublicKey, 
+  lamports: number
+): Promise<number> {
+  try {
+    // Create a temporary transaction to calculate the fee
+    const { Transaction, SystemProgram } = await import('@solana/web3.js');
+    const tempTransaction = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey,
+        toPubkey,
+        lamports,
+      })
+    );
+    
+    return calculateTransactionFee(connection, tempTransaction);
+  } catch (error) {
+    console.error('Failed to calculate transfer fee:', error);
+    // Fallback to a reasonable default fee
+    return 0.000005;
+  }
+}
+
+/**
+ * Calculates the total cost of voting (rent-exempt minimum + transaction fee)
+ * @param connection - Solana connection instance
+ * @param program - The Anchor program instance
+ * @param proposalPubkey - The proposal's public key
+ * @param voterPubkey - The voter's public key
+ * @param payerPubkey - The payer's public key
+ * @param choice - The vote choice (0-255)
+ * @returns Promise that resolves to the total cost in SOL
+ */
+export async function calculateVoteCost(
+  connection: Connection,
+  program: { methods: { vote: (choice: number) => { accounts: (accounts: any) => { transaction: () => Promise<any> } } } },
+  proposalPubkey: PublicKey,
+  voterPubkey: PublicKey,
+  payerPubkey: PublicKey,
+  choice: number
+): Promise<{ rentExemptMinimum: number; transactionFee: number; totalCost: number }> {
+  try {
+    // Calculate rent-exempt minimum for vote account (74 bytes)
+    const rentExemptMinimum = await calculateVoteAccountRentExemptMinimum(connection);
+    
+    // Create a temporary vote transaction to calculate the fee
+    const tempTransaction = await program.methods
+      .vote(choice)
+      .accounts({
+        proposal: proposalPubkey,
+        voter: voterPubkey,
+        payer: payerPubkey,
+      })
+      .transaction();
+    
+    const transactionFee = await calculateTransactionFee(connection, tempTransaction);
+    
+    return {
+      rentExemptMinimum,
+      transactionFee,
+      totalCost: rentExemptMinimum + transactionFee
+    };
+  } catch (error) {
+    console.error('Failed to calculate vote cost:', error);
+    // Fallback values
+    const fallbackRent = 0.00089; // Approximate rent for 74 bytes
+    const fallbackFee = 0.000005; // Approximate transaction fee
+    return {
+      rentExemptMinimum: fallbackRent,
+      transactionFee: fallbackFee,
+      totalCost: fallbackRent + fallbackFee
+    };
+  }
+}

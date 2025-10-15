@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ProposalForm } from '@/components/ProposalForm';
 import { ProposalPreview } from '@/components/ProposalPreview';
-import { Spinner } from '@phosphor-icons/react';
+import { SpinnerIcon } from '@phosphor-icons/react';
 import { useAtom } from 'jotai';
 import { proposalFormDataAtom } from '@/store/proposal';
 import { userAtom } from '@/store';
@@ -188,7 +188,7 @@ export default function CreateProposalPage() {
         return (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <div className="flex items-center">
-              <Spinner className="h-4 w-4 text-blue-600 mr-3 animate-spin" />
+              <SpinnerIcon className="h-4 w-4 text-blue-600 mr-3 animate-spin" />
               <span className="text-blue-800">Creating proposal in database...</span>
             </div>
           </div>
@@ -198,7 +198,7 @@ export default function CreateProposalPage() {
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <Spinner className="h-4 w-4 text-yellow-600 mr-3 animate-spin" />
+                <SpinnerIcon className="h-4 w-4 text-yellow-600 mr-3 animate-spin" />
                 <span className="text-yellow-800">Creating proposal on blockchain...</span>
               </div>
               <button
@@ -214,7 +214,7 @@ export default function CreateProposalPage() {
         return (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
             <div className="flex items-center">
-              <Spinner className="h-4 w-4 text-green-600 mr-3 animate-spin" />
+              <SpinnerIcon className="h-4 w-4 text-green-600 mr-3 animate-spin" />
               <span className="text-green-800">Finalizing proposal...</span>
             </div>
           </div>
@@ -259,7 +259,7 @@ export default function CreateProposalPage() {
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
-            <Spinner className="h-8 w-8 text-blue-600 animate-spin" />
+            <SpinnerIcon className="h-8 w-8 text-blue-600 animate-spin" />
           </div>
         </div>
       </div>

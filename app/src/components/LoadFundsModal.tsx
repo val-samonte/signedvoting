@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
 import { useAnchor } from '@/hooks/useAnchor';
-import { Spinner } from '@phosphor-icons/react';
+import { SpinnerIcon } from '@phosphor-icons/react';
+import { calculateTransferFee } from '@/lib/utils';
 
 interface LoadFundsModalProps {
   isOpen: boolean;
@@ -23,11 +24,48 @@ export function LoadFundsModal({
   const [numberOfVotes, setNumberOfVotes] = useState<number>(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [transactionFee, setTransactionFee] = useState<number>(0);
+  const [isFeeLoading, setIsFeeLoading] = useState(false);
   const { program } = useAnchor();
 
-  if (!isOpen) return null;
-
   const totalAmount = numberOfVotes * rentExemptMinimum;
+  const totalTransactionFee = transactionFee * numberOfVotes;
+  const totalWithFee = totalAmount + totalTransactionFee;
+
+  // Calculate transaction fee when numberOfVotes or rentExemptMinimum changes
+  useEffect(() => {
+    const calculateFee = async () => {
+      if (!program?.provider?.connection || !program?.provider?.wallet?.publicKey || numberOfVotes <= 0) {
+        setTransactionFee(0);
+        return;
+      }
+
+      setIsFeeLoading(true);
+      try {
+        const fromPubkey = program.provider.wallet.publicKey;
+        const toPubkey = new PublicKey(fundsAccountAddress);
+        const totalLamports = Math.ceil(totalAmount * 1e9);
+        
+        const fee = await calculateTransferFee(
+          program.provider.connection,
+          fromPubkey,
+          toPubkey,
+          totalLamports
+        );
+        
+        setTransactionFee(fee);
+      } catch (err) {
+        console.error('Failed to calculate transaction fee:', err);
+        setTransactionFee(0.000005); // Fallback fee
+      } finally {
+        setIsFeeLoading(false);
+      }
+    };
+
+    calculateFee();
+  }, [numberOfVotes, rentExemptMinimum, program?.provider?.connection, program?.provider?.wallet?.publicKey, fundsAccountAddress, totalAmount]);
+
+  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,16 +160,21 @@ export function LoadFundsModal({
           <div className="bg-gray-50 p-3 rounded-md">
             <div className="text-sm text-gray-600">
               <div className="flex justify-between">
-                <span>Votes:</span>
-                <span>{numberOfVotes}</span>
+                <span>Cost:</span>
+                <span>{totalAmount.toFixed(6)} SOL for {numberOfVotes} vote{numberOfVotes > 1 ? 's' : ''}</span>
               </div>
               <div className="flex justify-between">
-                <span>Cost per vote:</span>
-                <span>{rentExemptMinimum.toFixed(6)} SOL</span>
+                <span>Transaction fees:</span>
+                <span className="flex items-center">
+                  {isFeeLoading ? (
+                    <SpinnerIcon className="h-3 w-3 mr-1 animate-spin" />
+                  ) : null}
+                  {totalTransactionFee.toFixed(6)} SOL
+                </span>
               </div>
               <div className="flex justify-between font-medium text-gray-900 border-t border-gray-200 pt-2 mt-2">
-                <span>Total amount:</span>
-                <span>{totalAmount.toFixed(6)} SOL</span>
+                <span>Total from wallet:</span>
+                <span>{totalWithFee.toFixed(6)} SOL</span>
               </div>
             </div>
           </div>
@@ -153,12 +196,12 @@ export function LoadFundsModal({
             </button>
             <button
               type="submit"
-              disabled={isLoading || numberOfVotes <= 0}
+              disabled={isLoading || numberOfVotes <= 0 || isFeeLoading}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {isLoading ? (
                 <div className="flex items-center justify-center">
-                  <Spinner className="h-4 w-4 text-white mr-2 animate-spin" />
+                  <SpinnerIcon className="h-4 w-4 text-white mr-2 animate-spin" />
                   Loading...
                 </div>
               ) : (
