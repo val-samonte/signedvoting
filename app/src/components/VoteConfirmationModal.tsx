@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
 import { useAtom } from 'jotai';
 import { userAtom } from '@/store';
 import { FreehandSignature } from './FreehandSignature';
@@ -9,7 +8,8 @@ import {
   proposalSignatureAtomFamily,
   processSignature
 } from '@/store/proposal';
-import { getStroke } from 'perfect-freehand';
+import { PublicKey } from '@solana/web3.js';
+import { useAnchor } from '@/hooks/useAnchor';
 
 interface VoteConfirmationModalProps {
   isOpen: boolean;
@@ -20,62 +20,20 @@ interface VoteConfirmationModalProps {
     label: string;
   } | null;
   proposalId: number;
+  proposalPda?: string;
 }
 
 export function VoteConfirmationModal({ 
   isOpen, 
   onClose, 
   chosenChoice,
-  proposalId
+  proposalId,
+  proposalPda
 }: VoteConfirmationModalProps) {
   const [signatureStrokes, setSignatureStrokes] = useAtom(proposalSignatureAtomFamily(proposalId));
   const [user] = useAtom(userAtom);
+  const { program } = useAnchor();
   const hasSignature = signatureStrokes.length > 0;
-  
-  
-
-  // Convert strokes to SVG string for voting
-  const getSignatureSvg = useCallback((strokes: number[][][]) => {
-    if (strokes.length === 0) return '';
-    
-    const getSvgPathFromStroke = (stroke: number[][]) => {
-      if (stroke.length < 4) return '';
-      
-      const average = (a: number, b: number) => (a + b) / 2;
-      let a = stroke[0];
-      let b = stroke[1];
-      const c = stroke[2];
-
-      let pathData = `M${a[0].toFixed(2)},${a[1].toFixed(2)} Q${b[0].toFixed(2)},${b[1].toFixed(2)} ${average(b[0], c[0]).toFixed(2)},${average(b[1], c[1]).toFixed(2)} T`;
-
-      for (let i = 2, max = stroke.length - 1; i < max; i++) {
-        a = stroke[i];
-        b = stroke[i + 1];
-        pathData += `${average(a[0], b[0]).toFixed(2)},${average(a[1], b[1]).toFixed(2)} `;
-      }
-
-      pathData += 'Z';
-      return pathData;
-    };
-
-    const paths = strokes.map(strokePoints => {
-      const stroke = getStroke(strokePoints, {
-        size: 4,
-        thinning: 0.5,
-        smoothing: 0.5,
-        streamline: 0.5,
-        simulatePressure: true,
-        last: true,
-      });
-      return getSvgPathFromStroke(stroke);
-    }).filter(path => path !== '');
-    
-    if (paths.length === 0) return '';
-    
-    return `<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">
-      ${paths.map(path => `<path d="${path}" fill="black" stroke="black" stroke-width="1"/>`).join('')}
-    </svg>`;
-  }, []);
 
   if (!isOpen || !chosenChoice) return null;
 
@@ -92,10 +50,6 @@ export function VoteConfirmationModal({
   };
 
   const handleVoteClick = async () => {
-    // TODO: Implement actual vote submission
-    console.log('Vote clicked for choice:', chosenChoice);
-    
-    /* COMMENTED OUT - PRESERVE FOR FUTURE USE
     try {
       // Get actual user ID from auth context
       if (!user?.id) {
@@ -103,41 +57,79 @@ export function VoteConfirmationModal({
       }
       const userId = user.id.toString();
       
-      // Process signature and get all results
+      // 1. Get the keypair from PNG file using processSignature
       const results = await processSignature(signatureStrokes, proposalId, userId);
       
-      console.log('Voting with choice:', chosenChoice);
-      console.log('Signature SVG:', results.svgString);
-      console.log('PNG blob generated:', {
-        size: results.pngBlob.size,
-        type: results.pngBlob.type
-      });
-      console.log('SHA256:', results.sha256);
-      console.log('Keypair generated:', {
-        publicKey: results.keypair?.publicKey.toString(),
-        secretKey: results.keypair ? Array.from(results.keypair.secretKey) : null
-      });
-      console.log('Final SHA256:', results.finalSha256);
+      if (!results.keypair) {
+        throw new Error('Failed to generate keypair from signature');
+      }
       
-      // Automatically save a copy of the PNG when voting
-      // This ensures the user can derive the same keypair from the saved PNG
-      const url = URL.createObjectURL(results.pngBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `proposal_${proposalId}_signature_vote.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      // 2. Get the index of the user choice
+      const choiceIndex = chosenChoice.index;
       
-      console.log('PNG automatically saved for keypair derivation');
+      // 3. Get the 2nd level hash (sha256 of the sha256 used to generate the keypair)
+      const signatureHash = results.finalSha256; // This is the 2nd level hash
       
-      // TODO: Implement actual vote submission with results
+      // 4. Get proposal PDA from props
+      if (!proposalPda) {
+        throw new Error('Proposal PDA is required for voting');
+      }
+      
+      // 5. Console log the props to be sent as partial transaction
+      console.log('=== VOTE TRANSACTION DATA ===');
+      console.log('Proposal PDA:', proposalPda);
+      console.log('Keypair Public Key:', results.keypair.publicKey.toString());
+      console.log('Choice Index:', choiceIndex);
+      console.log('2nd Level Hash (signature_hash):', signatureHash);
+      console.log('=============================');
+      
+      /* COMMENTED OUT - PRESERVE FOR FUTURE USE
+      try {
+        // Get actual user ID from auth context
+        if (!user?.id) {
+          throw new Error('User ID is required for signature processing');
+        }
+        const userId = user.id.toString();
+        
+        // Process signature and get all results
+        const results = await processSignature(signatureStrokes, proposalId, userId);
+        
+        console.log('Voting with choice:', chosenChoice);
+        console.log('Signature SVG:', results.svgString);
+        console.log('PNG blob generated:', {
+          size: results.pngBlob.size,
+          type: results.pngBlob.type
+        });
+        console.log('SHA256:', results.sha256);
+        console.log('Keypair generated:', {
+          publicKey: results.keypair?.publicKey.toString(),
+          secretKey: results.keypair ? Array.from(results.keypair.secretKey) : null
+        });
+        console.log('Final SHA256:', results.finalSha256);
+        
+        // Automatically save a copy of the PNG when voting
+        // This ensures the user can derive the same keypair from the saved PNG
+        const url = URL.createObjectURL(results.pngBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `proposal_${proposalId}_signature_vote.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        console.log('PNG automatically saved for keypair derivation');
+        
+        // TODO: Implement actual vote submission with results
+        
+      } catch (error) {
+        console.error('Error processing signature:', error);
+      }
+      */
       
     } catch (error) {
       console.error('Error processing signature:', error);
     }
-    */
   };
 
 

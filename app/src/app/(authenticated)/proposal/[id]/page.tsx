@@ -732,6 +732,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
             }}
             chosenChoice={chosenChoice}
             proposalId={proposalId}
+            proposalPda={proposal?.pda}
           />
         )}
       </div>
