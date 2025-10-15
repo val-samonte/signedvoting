@@ -13,7 +13,7 @@ import { userAtom } from '@/store';
 import { PublicKey } from '@solana/web3.js';
 import { PauseIcon } from '@phosphor-icons/react';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
-import { trimAddress, computeProposalHash } from '@/lib/utils';
+import { trimAddress, computeProposalHash, calculateVoteAccountRentExemptMinimum } from '@/lib/utils';
 
 type ProposalData = {
   id: number;
@@ -54,6 +54,10 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   const [computedHash, setComputedHash] = useState<string | null>(null);
   const [isHashLoading, setIsHashLoading] = useState(false);
   const [isProposalFinalized, setIsProposalFinalized] = useState(false);
+  const [fundsAccountBalance, setFundsAccountBalance] = useState<number | null>(null);
+  const [isBalanceLoading, setIsBalanceLoading] = useState(false);
+  const [rentExemptMinimum, setRentExemptMinimum] = useState<number | null>(null);
+  const [isRentLoading, setIsRentLoading] = useState(false);
   const isLoadingRef = useRef(false);
 
   // We'll handle wallet protection manually after loading the proposal
@@ -125,6 +129,39 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
     }
   };
 
+  const fetchFundsAccountBalance = async (payerPubkey: string) => {
+    if (!program) return;
+    
+    setIsBalanceLoading(true);
+    try {
+      const payerPublicKey = new PublicKey(payerPubkey);
+      const balance = await program.provider.connection.getBalance(payerPublicKey);
+      // Convert lamports to SOL
+      const balanceInSOL = balance / 1e9;
+      setFundsAccountBalance(balanceInSOL);
+    } catch (err) {
+      console.error('Failed to fetch funds account balance:', err);
+      setFundsAccountBalance(null);
+    } finally {
+      setIsBalanceLoading(false);
+    }
+  };
+
+  const fetchRentExemptMinimum = async () => {
+    if (!program) return;
+    
+    setIsRentLoading(true);
+    try {
+      const minimum = await calculateVoteAccountRentExemptMinimum(program.provider.connection);
+      setRentExemptMinimum(minimum);
+    } catch (err) {
+      console.error('Failed to fetch rent-exempt minimum:', err);
+      setRentExemptMinimum(null);
+    } finally {
+      setIsRentLoading(false);
+    }
+  };
+
   const loadProposal = async (id: number) => {
     
     // Prevent multiple loads if we're already loading or in signing process
@@ -146,6 +183,12 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
       
       // Compute hash from proposal data
       await computeHashFromProposal(data);
+      
+      // Fetch funds account balance and rent-exempt minimum
+      await Promise.all([
+        fetchFundsAccountBalance(data.payerPubkey),
+        fetchRentExemptMinimum()
+      ]);
       
       if (data.pda) {
         // Proposal is already finalized - fetch onchain hash
@@ -354,7 +397,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                   setUserCancelledTx(false);
                   handleOnchainCreation();
                 }}
-                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
+                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors cursor-pointer"
               >
                 Continue
               </button>
@@ -375,7 +418,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                   setCurrentState('signing');
                   setError(null);
                 }}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors cursor-pointer"
               >
                 Retry
               </button>
@@ -480,12 +523,37 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                         href={`https://solscan.io/account/${proposal.payerPubkey}?cluster=devnet`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 underline font-mono text-sm"
+                        className="text-blue-600 hover:text-blue-800 underline font-mono text-sm cursor-pointer"
                       >
                         {trimAddress(proposal.payerPubkey)}
                       </a>
-                      <span className="text-sm text-gray-500">0 SOL</span>
+                      <div className="flex items-center">
+                        {isBalanceLoading || isRentLoading ? (
+                          <div className="flex items-center">
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-1"></div>
+                            <span className="text-sm text-gray-500">Loading...</span>
+                          </div>
+                        ) : fundsAccountBalance !== null && rentExemptMinimum !== null ? (
+                          <span className={`text-sm font-medium ${
+                            fundsAccountBalance < rentExemptMinimum ? 'text-red-600' : 'text-gray-500'
+                          }`}>
+                            {fundsAccountBalance.toFixed(6)} SOL
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-500">Failed to load</span>
+                        )}
+                      </div>
                     </div>
+                    {fundsAccountBalance !== null && rentExemptMinimum !== null && fundsAccountBalance < rentExemptMinimum && (
+                      <p className="text-xs text-red-500 mt-1">
+                        Insufficient balance for vote account creation (minimum: {rentExemptMinimum.toFixed(6)} SOL per vote)
+                      </p>
+                    )}
+                    {isWalletConnected && (
+                      <button className="mt-2 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer">
+                        Load Funds Account
+                      </button>
+                    )}
                   </div>
 
                   {/* Account (PDA) */}
@@ -495,7 +563,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                       href={`https://solscan.io/account/${proposal.pda}?cluster=devnet`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800 underline font-mono text-sm block"
+                      className="text-blue-600 hover:text-blue-800 underline font-mono text-sm block cursor-pointer"
                     >
                       {trimAddress(proposal.pda)}
                     </a>
