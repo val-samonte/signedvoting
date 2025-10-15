@@ -6,8 +6,8 @@ import { getStroke } from 'perfect-freehand';
 interface FreehandSignatureProps {
   width?: number;
   height?: number;
-  value?: number[][]; // The points array
-  onChange?: (points: number[][]) => void; // Called when points change
+  value?: number[][][]; // Array of stroke groups (each stroke is an array of points)
+  onChange?: (strokes: number[][][]) => void; // Called when strokes change
 }
 
 export function FreehandSignature({ 
@@ -19,8 +19,8 @@ export function FreehandSignature({
   const [isDrawing, setIsDrawing] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   
-  // Use the controlled value prop
-  const points = value;
+  // Use the controlled value prop - array of stroke groups
+  const strokes = value;
 
   const getSvgPathFromStroke = useCallback((stroke: number[][]) => {
     if (stroke.length < 4) {
@@ -60,9 +60,11 @@ export function FreehandSignature({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    onChange?.([[x, y, 0.5]]);
+    // Start a new stroke
+    const newStroke = [[x, y, 0.5]];
+    onChange?.([...strokes, newStroke]);
     setIsDrawing(true);
-  }, [onChange]);
+  }, [onChange, strokes]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDrawing || !svgRef.current) return;
@@ -71,23 +73,46 @@ export function FreehandSignature({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    onChange?.([...points, [x, y, 0.5]]);
-  }, [isDrawing, points, onChange]);
+    // Add point to the current (last) stroke
+    if (strokes.length > 0) {
+      const updatedStrokes = [...strokes];
+      const currentStroke = updatedStrokes[updatedStrokes.length - 1];
+      updatedStrokes[updatedStrokes.length - 1] = [...currentStroke, [x, y, 0.5]];
+      onChange?.(updatedStrokes);
+    }
+  }, [isDrawing, strokes, onChange]);
 
   const handlePointerUp = useCallback(() => {
     setIsDrawing(false);
   }, []);
 
-  const stroke = getStroke(points, {
-    size: 4,
-    thinning: 0.5,
-    smoothing: 0.5,
-    streamline: 0.5,
-    simulatePressure: true,
-    last: true,
-  });
+  // Render all strokes
+  const renderStrokes = () => {
+    return strokes.map((strokePoints, index) => {
+      if (strokePoints.length < 4) return null;
+      
+      const stroke = getStroke(strokePoints, {
+        size: 4,
+        thinning: 0.5,
+        smoothing: 0.5,
+        streamline: 0.5,
+        simulatePressure: true,
+        last: true,
+      });
 
-  const pathData = getSvgPathFromStroke(stroke);
+      const pathData = getSvgPathFromStroke(stroke);
+      
+      return (
+        <path
+          key={index}
+          d={pathData}
+          fill="black"
+          stroke="black"
+          strokeWidth="1"
+        />
+      );
+    });
+  };
 
   return (
     <div className="flex flex-col items-center space-y-3">
@@ -105,17 +130,10 @@ export function FreehandSignature({
           onPointerLeave={handlePointerUp}
           style={{ touchAction: 'none' }}
         >
-          {pathData && (
-            <path
-              d={pathData}
-              fill="black"
-              stroke="black"
-              strokeWidth="1"
-            />
-          )}
+          {renderStrokes()}
         </svg>
         
-        {points.length === 0 && (
+        {strokes.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <p className="text-gray-400 text-sm">Draw your signature here</p>
           </div>

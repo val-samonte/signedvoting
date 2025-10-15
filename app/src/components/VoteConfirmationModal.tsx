@@ -24,41 +24,49 @@ export function VoteConfirmationModal({
   chosenChoice,
   proposalId
 }: VoteConfirmationModalProps) {
-  const [signaturePoints, setSignaturePoints] = useAtom(proposalSignatureAtomFamily(proposalId));
-  const hasSignature = signaturePoints.length > 0;
+  const [signatureStrokes, setSignatureStrokes] = useAtom(proposalSignatureAtomFamily(proposalId));
+  const hasSignature = signatureStrokes.length > 0;
 
-  // Convert points to SVG string for voting
-  const getSignatureSvg = useCallback((points: number[][]) => {
-    if (points.length === 0) return '';
+  // Convert strokes to SVG string for voting
+  const getSignatureSvg = useCallback((strokes: number[][][]) => {
+    if (strokes.length === 0) return '';
     
-    const stroke = getStroke(points, {
-      size: 4,
-      thinning: 0.5,
-      smoothing: 0.5,
-      streamline: 0.5,
-      simulatePressure: true,
-      last: true,
-    });
+    const getSvgPathFromStroke = (stroke: number[][]) => {
+      if (stroke.length < 4) return '';
+      
+      const average = (a: number, b: number) => (a + b) / 2;
+      let a = stroke[0];
+      let b = stroke[1];
+      const c = stroke[2];
 
-    if (stroke.length < 4) return '';
+      let pathData = `M${a[0].toFixed(2)},${a[1].toFixed(2)} Q${b[0].toFixed(2)},${b[1].toFixed(2)} ${average(b[0], c[0]).toFixed(2)},${average(b[1], c[1]).toFixed(2)} T`;
 
-    const average = (a: number, b: number) => (a + b) / 2;
-    let a = stroke[0];
-    let b = stroke[1];
-    const c = stroke[2];
+      for (let i = 2, max = stroke.length - 1; i < max; i++) {
+        a = stroke[i];
+        b = stroke[i + 1];
+        pathData += `${average(a[0], b[0]).toFixed(2)},${average(a[1], b[1]).toFixed(2)} `;
+      }
 
-    let pathData = `M${a[0].toFixed(2)},${a[1].toFixed(2)} Q${b[0].toFixed(2)},${b[1].toFixed(2)} ${average(b[0], c[0]).toFixed(2)},${average(b[1], c[1]).toFixed(2)} T`;
+      pathData += 'Z';
+      return pathData;
+    };
 
-    for (let i = 2, max = stroke.length - 1; i < max; i++) {
-      a = stroke[i];
-      b = stroke[i + 1];
-      pathData += `${average(a[0], b[0]).toFixed(2)},${average(a[1], b[1]).toFixed(2)} `;
-    }
-
-    pathData += 'Z';
+    const paths = strokes.map(strokePoints => {
+      const stroke = getStroke(strokePoints, {
+        size: 4,
+        thinning: 0.5,
+        smoothing: 0.5,
+        streamline: 0.5,
+        simulatePressure: true,
+        last: true,
+      });
+      return getSvgPathFromStroke(stroke);
+    }).filter(path => path !== '');
+    
+    if (paths.length === 0) return '';
     
     return `<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">
-      <path d="${pathData}" fill="black" stroke="black" stroke-width="1"/>
+      ${paths.map(path => `<path d="${path}" fill="black" stroke="black" stroke-width="1"/>`).join('')}
     </svg>`;
   }, []);
 
@@ -68,16 +76,16 @@ export function VoteConfirmationModal({
     onClose();
   };
 
-  const handleSignatureChange = (points: number[][]) => {
-    setSignaturePoints(points);
+  const handleSignatureChange = (strokes: number[][][]) => {
+    setSignatureStrokes(strokes);
   };
 
   const clearSignature = () => {
-    setSignaturePoints([]);
+    setSignatureStrokes([]);
   };
 
   const handleVoteClick = () => {
-    const signatureSvg = getSignatureSvg(signaturePoints);
+    const signatureSvg = getSignatureSvg(signatureStrokes);
     // TODO: Implement vote submission with signatureSvg
     console.log('Voting with choice:', chosenChoice);
     console.log('Signature SVG:', signatureSvg);
@@ -111,7 +119,7 @@ export function VoteConfirmationModal({
           <FreehandSignature 
             width={300}
             height={200}
-            value={signaturePoints}
+            value={signatureStrokes}
             onChange={handleSignatureChange}
           />
 

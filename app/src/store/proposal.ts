@@ -186,7 +186,7 @@ export const resetProposalFormAtom = atom(
   }
 );
 
-// AtomFamily for storing signature points by proposal ID
+// AtomFamily for storing signature strokes by proposal ID
 export const proposalSignatureAtomFamily = atomFamily((proposalId: number) => 
-  atom<number[][]>([])
+  atom<number[][][]>([]) // Array of stroke groups
 );
