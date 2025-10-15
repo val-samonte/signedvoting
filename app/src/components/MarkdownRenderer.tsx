@@ -33,7 +33,7 @@ export function MarkdownRenderer({ children }: MarkdownRendererProps) {
           </h4>
         ),
         p: ({ children }) => (
-          <p className="text-gray-700 leading-relaxed mb-2 text-xs">
+          <p className="text-gray-700 leading-relaxed mb-2">
             {children}
           </p>
         ),

@@ -59,7 +59,7 @@ export function ProposalCard({ proposal }: ProposalCardProps) {
 
         {/* Description with markdown rendering and conditional gradient mask */}
         <div className="relative max-h-[300px] overflow-hidden">
-          <div ref={contentRef} className="prose prose-sm max-w-none">
+          <div ref={contentRef} className="prose prose-sm max-w-none text-xs">
             <MarkdownRenderer>{proposal.description}</MarkdownRenderer>
           </div>
           {/* Gradient mask only shown when content exceeds 300px */}
