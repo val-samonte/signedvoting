@@ -11,7 +11,7 @@ import { isWalletConnectedAtom, walletPublicKeyAtom, userWalletAddressAtom } fro
 import { userAtom } from '@/store';
 // import { useWalletProtection } from '@/hooks/useWalletProtection';
 import { PublicKey } from '@solana/web3.js';
-import { PauseIcon, SpinnerIcon } from '@phosphor-icons/react';
+import { PauseIcon, SpinnerIcon, CheckCircleIcon } from '@phosphor-icons/react';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { LoadFundsModal } from '@/components/LoadFundsModal';
 import { VoteConfirmationModal } from '@/components/VoteConfirmationModal';
@@ -188,7 +188,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
 
   const handleVoteSuccess = async (transactionSignature: string) => {
     // Refresh the funds account balance and vote status after successful voting
-    if (proposal) {
+    if (proposal && proposalId) {
       await Promise.all([
         fetchFundsAccountBalance(proposal.payerPubkey),
         checkUserVoteStatus(proposalId)
@@ -546,9 +546,19 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
             {/* Main Body - takes remaining space */}
             <div className="flex-1 flex flex-col xl:min-h-[calc(100vh-4rem)]">
               {/* Proposal Name */}
-              <h1 className="text-3xl font-bold text-gray-900 flex-none mb-6">
-                {proposal.name}
-              </h1>
+              <div className="flex-none mb-6">
+                <h1 className="text-3xl font-bold text-gray-900">
+                  {proposal.name}
+                </h1>
+                {votingState === 'already_voted' && (
+                  <div className="flex items-center mt-2">
+                    <div className="flex items-center px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                      <CheckCircleIcon className="w-4 h-4 mr-1" weight="fill" />
+                      Voted
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Description - takes available space on xl, normal flow below */}
               <div className="xl:flex-1 xl:overflow-y-auto xl:mb-6 mb-6">
@@ -573,9 +583,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                           className={`group flex items-center space-x-3 p-4 bg-white rounded-lg border border-gray-200 shadow-sm flex-1 transition-all duration-200 ${
                             votingState === 'enabled' 
                               ? 'cursor-pointer hover:bg-blue-600 hover:text-white hover:border-blue-600' 
-                              : isDisabled 
-                                ? 'cursor-not-allowed' 
-                                : ''
+                              : 'cursor-default'
                           }`}
                           onClick={() => {
                             if (votingState === 'enabled') {
@@ -596,7 +604,9 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                           }`}>
                             {choiceLabel}.
                           </span>
-                          <span className="text-gray-900 group-hover:text-white transition-colors duration-200">{choice}</span>
+                          <span className={`text-gray-900 transition-colors duration-200 ${
+                            votingState === 'enabled' ? 'group-hover:text-white' : ''
+                          }`}>{choice}</span>
                         </div>
                       );
                     })}
@@ -621,14 +631,6 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                     </div>
                   )}
                   
-                  {/* Message for already voted state */}
-                  {votingState === 'already_voted' && (
-                    <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                      <p className="text-green-800 text-center font-medium">
-                        You have already voted on this proposal
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
