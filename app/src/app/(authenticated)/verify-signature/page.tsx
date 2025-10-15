@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { getSha256FromBlob, getKeypairFromSha256, getFinalSha256 } from '@/store/proposal';
+import { getSha256FromBlob, getKeypairFromUserAndBlob, getFinalSha256 } from '@/store/proposal';
 
 export default function VerifySignaturePage() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -26,7 +26,7 @@ export default function VerifySignaturePage() {
       // Process the uploaded PNG file
       const sha256 = await getSha256FromBlob(file);
       const userId = 'user_placeholder'; // Same as in VoteConfirmationModal
-      const keypair = getKeypairFromSha256(sha256, userId);
+      const keypair = await getKeypairFromUserAndBlob(userId, file);
       const finalSha256 = await getFinalSha256(sha256);
 
       setVerificationResults({

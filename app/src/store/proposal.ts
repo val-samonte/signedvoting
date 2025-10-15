@@ -296,16 +296,25 @@ export const getSha256FromBlob = async (blob: Blob): Promise<string> => {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
-// 4. Generate Solana keypair from user ID and SHA256
-export const getKeypairFromSha256 = (sha256: string, userId: string): Keypair | null => {
-  if (!sha256) return null;
+// 4. Generate Solana keypair from user ID and blob
+export const getKeypairFromUserAndBlob = async (userId: string, blob: Blob): Promise<Keypair | null> => {
+  if (!blob) return null;
   
-  // Create seed from user ID and SHA256
-  const seed = `${userId}_${sha256}`;
-  const seedBuffer = new TextEncoder().encode(seed);
+  // Create combined data: user ID + blob
+  const userIdBuffer = new TextEncoder().encode(userId);
+  const blobBuffer = await blob.arrayBuffer();
   
-  // Generate keypair from seed
-  const keypair = Keypair.fromSeed(seedBuffer.slice(0, 32)); // Solana seeds must be 32 bytes
+  // Combine user ID and blob data
+  const combinedBuffer = new Uint8Array(userIdBuffer.length + blobBuffer.byteLength);
+  combinedBuffer.set(userIdBuffer, 0);
+  combinedBuffer.set(new Uint8Array(blobBuffer), userIdBuffer.length);
+  
+  // Hash the combined data
+  const hashBuffer = await crypto.subtle.digest('SHA-256', combinedBuffer);
+  const hashArray = new Uint8Array(hashBuffer);
+  
+  // Use the hash as seed for keypair (first 32 bytes)
+  const keypair = Keypair.fromSeed(hashArray.slice(0, 32));
   
   return keypair;
 };
@@ -336,11 +345,11 @@ export const processSignature = async (strokes: number[][][], proposalId: number
     throw new Error('Failed to generate PNG from signature');
   }
   
-  // 3. Generate SHA256 from blob
+  // 3. Generate SHA256 from blob (for logging/debugging)
   const sha256 = await getSha256FromBlob(pngBlob);
   
-  // 4. Generate keypair
-  const keypair = getKeypairFromSha256(sha256, userId);
+  // 4. Generate keypair from user ID + blob hash
+  const keypair = await getKeypairFromUserAndBlob(userId, pngBlob);
   
   // 5. Generate final SHA256
   const finalSha256 = await getFinalSha256(sha256);
