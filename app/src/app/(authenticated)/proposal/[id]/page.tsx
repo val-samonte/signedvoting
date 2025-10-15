@@ -60,6 +60,8 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   const [rentExemptMinimum, setRentExemptMinimum] = useState<number | null>(null);
   const [isRentLoading, setIsRentLoading] = useState(false);
   const [isLoadFundsModalOpen, setIsLoadFundsModalOpen] = useState(false);
+  const [hasUserVoted, setHasUserVoted] = useState<boolean | null>(null);
+  const [isVoteStatusLoading, setIsVoteStatusLoading] = useState(false);
   const isLoadingRef = useRef(false);
 
   // We'll handle wallet protection manually after loading the proposal
@@ -171,6 +173,48 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
     }
   };
 
+  const checkUserVoteStatus = async (proposalId: number) => {
+    if (!user) return;
+    
+    setIsVoteStatusLoading(true);
+    try {
+      const response = await fetch(`/api/proposal/${proposalId}/vote-status`);
+      if (response.ok) {
+        const data = await response.json();
+        setHasUserVoted(data.hasVoted);
+      } else {
+        console.error('Failed to check vote status');
+        setHasUserVoted(false);
+      }
+    } catch (err) {
+      console.error('Error checking vote status:', err);
+      setHasUserVoted(false);
+    } finally {
+      setIsVoteStatusLoading(false);
+    }
+  };
+
+  // Determine voting state based on funds and user vote status
+  const getVotingState = () => {
+    if (!proposal || !isProposalFinalized) return 'loading';
+    
+    const hasEnoughFunds = fundsAccountBalance !== null && 
+                          rentExemptMinimum !== null && 
+                          fundsAccountBalance >= rentExemptMinimum;
+    
+    if (!hasEnoughFunds) {
+      return 'insufficient_funds';
+    }
+    
+    if (hasUserVoted === true) {
+      return 'already_voted';
+    }
+    
+    return 'enabled';
+  };
+
+  const votingState = getVotingState();
+
   const loadProposal = async (id: number) => {
     
     // Prevent multiple loads if we're already loading or in signing process
@@ -193,10 +237,11 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
       // Compute hash from proposal data
       await computeHashFromProposal(data);
       
-      // Fetch funds account balance and rent-exempt minimum
+      // Fetch funds account balance, rent-exempt minimum, and vote status
       await Promise.all([
         fetchFundsAccountBalance(data.payerPubkey),
-        fetchRentExemptMinimum()
+        fetchRentExemptMinimum(),
+        checkUserVoteStatus(id)
       ]);
       
       if (data.pda) {
@@ -493,21 +538,69 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
 
               {/* Choices - pushed to bottom on xl, normal flow below */}
               <div className="xl:flex-none">
-                <div className="flex flex-col xl:flex-row gap-4">
-                  {proposal.choices.map((choice, index) => {
-                    const choiceLabel = String.fromCharCode(97 + index); // a, b, c, etc.
-                    return (
-                      <div
-                        key={index}
-                        className="flex items-center space-x-3 p-4 bg-white rounded-lg border border-gray-200 shadow-sm flex-1"
-                      >
-                        <span className="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-800 text-sm font-medium rounded-full flex items-center justify-center">
-                          {choiceLabel}.
-                        </span>
-                        <span className="text-gray-900">{choice}</span>
+                <div className="relative">
+                  <div className={`flex flex-col xl:flex-row gap-4 ${votingState === 'insufficient_funds' ? 'opacity-60' : ''}`}>
+                    {proposal.choices.map((choice, index) => {
+                      const choiceLabel = String.fromCharCode(97 + index); // a, b, c, etc.
+                      const isDisabled = votingState === 'insufficient_funds' || votingState === 'already_voted';
+                      
+                      return (
+                        <div
+                          key={index}
+                          className={`group flex items-center space-x-3 p-4 bg-white rounded-lg border border-gray-200 shadow-sm flex-1 transition-all duration-200 ${
+                            votingState === 'enabled' 
+                              ? 'cursor-pointer hover:bg-blue-600 hover:text-white hover:border-blue-600' 
+                              : isDisabled 
+                                ? 'cursor-not-allowed' 
+                                : ''
+                          }`}
+                          onClick={() => {
+                            if (votingState === 'enabled') {
+                              // TODO: Handle vote selection in phase 2
+                              console.log('Vote selected:', index, choice);
+                            }
+                          }}
+                        >
+                          <span className={`flex-shrink-0 w-8 h-8 text-sm font-medium rounded-full flex items-center justify-center transition-colors duration-200 ${
+                            votingState === 'enabled' 
+                              ? 'bg-blue-100 text-blue-800 group-hover:bg-white group-hover:text-blue-600' 
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {choiceLabel}.
+                          </span>
+                          <span className="text-gray-900 group-hover:text-white transition-colors duration-200">{choice}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Overlay for insufficient funds state */}
+                  {votingState === 'insufficient_funds' && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-[1px] rounded-lg">
+                      <div className="text-center">
+                        <p className="text-gray-600 text-sm font-medium mb-4">
+                          Proposal does not have enough funds to accept votes
+                        </p>
+                        {isWalletConnected && (
+                          <button
+                            onClick={() => setIsLoadFundsModalOpen(true)}
+                            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 cursor-pointer"
+                          >
+                            Load Funds Account
+                          </button>
+                        )}
                       </div>
-                    );
-                  })}
+                    </div>
+                  )}
+                  
+                  {/* Message for already voted state */}
+                  {votingState === 'already_voted' && (
+                    <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-green-800 text-center font-medium">
+                        You have already voted on this proposal
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
