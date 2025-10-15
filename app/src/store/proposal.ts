@@ -1,5 +1,8 @@
 import { atom } from 'jotai';
 import { atomFamily } from 'jotai/utils';
+import { getStroke } from 'perfect-freehand';
+import { Keypair } from '@solana/web3.js';
+import { createHash } from 'crypto';
 
 // Proposal form data atom
 export const proposalFormDataAtom = atom({
@@ -190,3 +193,181 @@ export const resetProposalFormAtom = atom(
 export const proposalSignatureAtomFamily = atomFamily((proposalId: number) => 
   atom<number[][][]>([]) // Array of stroke groups
 );
+
+// Helper function to convert strokes to SVG string
+const getSignatureSvg = (strokes: number[][][]) => {
+  if (strokes.length === 0) return '';
+  
+  const getSvgPathFromStroke = (stroke: number[][]) => {
+    if (stroke.length < 4) return '';
+    
+    const average = (a: number, b: number) => (a + b) / 2;
+    let a = stroke[0];
+    let b = stroke[1];
+    const c = stroke[2];
+
+    let pathData = `M${a[0].toFixed(2)},${a[1].toFixed(2)} Q${b[0].toFixed(2)},${b[1].toFixed(2)} ${average(b[0], c[0]).toFixed(2)},${average(b[1], c[1]).toFixed(2)} T`;
+
+    for (let i = 2, max = stroke.length - 1; i < max; i++) {
+      a = stroke[i];
+      b = stroke[i + 1];
+      pathData += `${average(a[0], b[0]).toFixed(2)},${average(a[1], b[1]).toFixed(2)} `;
+    }
+
+    pathData += 'Z';
+    return pathData;
+  };
+
+  const paths = strokes.map(strokePoints => {
+    const stroke = getStroke(strokePoints, {
+      size: 4,
+      thinning: 0.5,
+      smoothing: 0.5,
+      streamline: 0.5,
+      simulatePressure: true,
+      last: true,
+    });
+    return getSvgPathFromStroke(stroke);
+  }).filter(path => path !== '');
+  
+  if (paths.length === 0) return '';
+  
+  return `<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">
+    ${paths.map(path => `<path d="${path}" fill="black" stroke="black" stroke-width="1"/>`).join('')}
+  </svg>`;
+};
+
+// Utility functions for signature processing (run only when needed)
+
+// 1. Convert signature strokes to SVG string
+export const getSignatureSvgFromStrokes = (strokes: number[][][]) => {
+  return getSignatureSvg(strokes);
+};
+
+// 2. Convert SVG string to PNG blob
+export const getPngBlobFromSvg = async (svgString: string, proposalId: number): Promise<Blob | null> => {
+  if (!svgString) return null;
+  
+  // Convert SVG to PNG blob
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  
+  canvas.width = 300;
+  canvas.height = 200;
+  
+  const img = new Image();
+  const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
+  const url = URL.createObjectURL(svgBlob);
+  
+  return new Promise<Blob | null>((resolve) => {
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0);
+      
+      // Convert canvas to PNG blob
+      canvas.toBlob((blob) => {
+        if (blob) {
+          // Store base64 in localStorage as backup for recovery only
+          const storageKey = `${proposalId}_signature`;
+          if (typeof window !== 'undefined') {
+            const reader = new FileReader();
+            reader.onload = () => {
+              localStorage.setItem(storageKey, reader.result as string);
+            };
+            reader.readAsDataURL(blob);
+          }
+        }
+        
+        URL.revokeObjectURL(url);
+        resolve(blob);
+      }, 'image/png');
+    };
+    img.src = url;
+  });
+};
+
+// 3. Generate SHA256 hash from blob
+export const getSha256FromBlob = async (blob: Blob): Promise<string> => {
+  if (!blob) return '';
+  
+  const arrayBuffer = await blob.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
+// 4. Generate Solana keypair from user ID and SHA256
+export const getKeypairFromSha256 = (sha256: string, userId: string): Keypair | null => {
+  if (!sha256) return null;
+  
+  // Create seed from user ID and SHA256
+  const seed = `${userId}_${sha256}`;
+  const seedBuffer = new TextEncoder().encode(seed);
+  
+  // Generate keypair from seed
+  const keypair = Keypair.fromSeed(seedBuffer.slice(0, 32)); // Solana seeds must be 32 bytes
+  
+  return keypair;
+};
+
+// 5. Generate final SHA256 of the first SHA256
+export const getFinalSha256 = async (sha256: string): Promise<string> => {
+  if (!sha256) return '';
+  
+  // Use a simple approach that works with TypeScript
+  const encoder = new TextEncoder();
+  const data = encoder.encode(sha256);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data as unknown as ArrayBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
+// 6. Main function to process signature and return all results
+export const processSignature = async (strokes: number[][][], proposalId: number, userId: string) => {
+  // 1. Convert strokes to SVG
+  const svgString = getSignatureSvgFromStrokes(strokes);
+  if (!svgString) {
+    throw new Error('No signature strokes provided');
+  }
+  
+  // 2. Convert SVG to PNG blob
+  const pngBlob = await getPngBlobFromSvg(svgString, proposalId);
+  if (!pngBlob) {
+    throw new Error('Failed to generate PNG from signature');
+  }
+  
+  // 3. Generate SHA256 from blob
+  const sha256 = await getSha256FromBlob(pngBlob);
+  
+  // 4. Generate keypair
+  const keypair = getKeypairFromSha256(sha256, userId);
+  
+  // 5. Generate final SHA256
+  const finalSha256 = await getFinalSha256(sha256);
+  
+  return {
+    svgString,
+    pngBlob,
+    sha256,
+    keypair,
+    finalSha256
+  };
+};
+
+// Utility function to recover PNG from localStorage backup
+export const recoverSignaturePngFromStorage = async (proposalId: number): Promise<Blob | null> => {
+  if (typeof window === 'undefined') return null;
+  
+  const storageKey = `${proposalId}_signature`;
+  const base64Data = localStorage.getItem(storageKey);
+  if (!base64Data) return null;
+  
+  try {
+    // Convert base64 back to blob
+    const response = await fetch(base64Data);
+    return await response.blob();
+  } catch (error) {
+    console.error('Failed to recover PNG from localStorage:', error);
+    return null;
+  }
+};

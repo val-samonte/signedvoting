@@ -4,7 +4,10 @@ import { useState, useCallback } from 'react';
 import { useAtom } from 'jotai';
 import { FreehandSignature } from './FreehandSignature';
 import { VoteButton } from './VoteButton';
-import { proposalSignatureAtomFamily } from '@/store/proposal';
+import { 
+  proposalSignatureAtomFamily,
+  processSignature
+} from '@/store/proposal';
 import { getStroke } from 'perfect-freehand';
 
 interface VoteConfirmationModalProps {
@@ -26,6 +29,8 @@ export function VoteConfirmationModal({
 }: VoteConfirmationModalProps) {
   const [signatureStrokes, setSignatureStrokes] = useAtom(proposalSignatureAtomFamily(proposalId));
   const hasSignature = signatureStrokes.length > 0;
+  
+  
 
   // Convert strokes to SVG string for voting
   const getSignatureSvg = useCallback((strokes: number[][][]) => {
@@ -84,12 +89,47 @@ export function VoteConfirmationModal({
     setSignatureStrokes([]);
   };
 
-  const handleVoteClick = () => {
-    const signatureSvg = getSignatureSvg(signatureStrokes);
-    // TODO: Implement vote submission with signatureSvg
-    console.log('Voting with choice:', chosenChoice);
-    console.log('Signature SVG:', signatureSvg);
+  const handleVoteClick = async () => {
+    try {
+      // TODO: Get actual user ID from auth context
+      const userId = 'user_placeholder';
+      
+      // Process signature and get all results
+      const results = await processSignature(signatureStrokes, proposalId, userId);
+      
+      console.log('Voting with choice:', chosenChoice);
+      console.log('Signature SVG:', results.svgString);
+      console.log('PNG blob generated:', {
+        size: results.pngBlob.size,
+        type: results.pngBlob.type
+      });
+      console.log('SHA256:', results.sha256);
+      console.log('Keypair generated:', {
+        publicKey: results.keypair?.publicKey.toString(),
+        secretKey: results.keypair ? Array.from(results.keypair.secretKey) : null
+      });
+      console.log('Final SHA256:', results.finalSha256);
+      
+      // Automatically save a copy of the PNG when voting
+      // This ensures the user can derive the same keypair from the saved PNG
+      const url = URL.createObjectURL(results.pngBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `proposal_${proposalId}_signature_vote.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      console.log('PNG automatically saved for keypair derivation');
+      
+      // TODO: Implement actual vote submission with results
+      
+    } catch (error) {
+      console.error('Error processing signature:', error);
+    }
   };
+
 
   return (
     <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
@@ -131,6 +171,7 @@ export function VoteConfirmationModal({
           >
             Clear Signature
           </button>
+
 
           {/* Vote Now Button */}
           <VoteButton 
