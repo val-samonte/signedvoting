@@ -13,6 +13,7 @@ import { userAtom } from '@/store';
 import { PublicKey } from '@solana/web3.js';
 import { PauseIcon } from '@phosphor-icons/react';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
+import { LoadFundsModal } from '@/components/LoadFundsModal';
 import { trimAddress, computeProposalHash, calculateVoteAccountRentExemptMinimum } from '@/lib/utils';
 
 type ProposalData = {
@@ -58,6 +59,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
   const [rentExemptMinimum, setRentExemptMinimum] = useState<number | null>(null);
   const [isRentLoading, setIsRentLoading] = useState(false);
+  const [isLoadFundsModalOpen, setIsLoadFundsModalOpen] = useState(false);
   const isLoadingRef = useRef(false);
 
   // We'll handle wallet protection manually after loading the proposal
@@ -159,6 +161,13 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
       setRentExemptMinimum(null);
     } finally {
       setIsRentLoading(false);
+    }
+  };
+
+  const handleLoadFundsSuccess = async () => {
+    // Refresh the funds account balance after successful funding
+    if (proposal) {
+      await fetchFundsAccountBalance(proposal.payerPubkey);
     }
   };
 
@@ -550,7 +559,10 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                       </p>
                     )}
                     {isWalletConnected && (
-                      <button className="mt-2 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer">
+                      <button 
+                        onClick={() => setIsLoadFundsModalOpen(true)}
+                        className="mt-2 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer"
+                      >
                         Load Funds Account
                       </button>
                     )}
@@ -597,6 +609,17 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
             </div>
           </div>
         </div>
+        
+        {/* Load Funds Modal */}
+        {proposal && rentExemptMinimum && (
+          <LoadFundsModal
+            isOpen={isLoadFundsModalOpen}
+            onClose={() => setIsLoadFundsModalOpen(false)}
+            fundsAccountAddress={proposal.payerPubkey}
+            rentExemptMinimum={rentExemptMinimum}
+            onSuccess={handleLoadFundsSuccess}
+          />
+        )}
       </div>
     );
   }
