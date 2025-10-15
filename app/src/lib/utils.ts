@@ -117,6 +117,11 @@ export async function calculateTransferFee(
       })
     );
     
+    // Get recent blockhash and set it on the transaction
+    const { blockhash } = await connection.getLatestBlockhash();
+    tempTransaction.recentBlockhash = blockhash;
+    tempTransaction.feePayer = fromPubkey;
+    
     return calculateTransactionFee(connection, tempTransaction);
   } catch (error) {
     console.error('Failed to calculate transfer fee:', error);

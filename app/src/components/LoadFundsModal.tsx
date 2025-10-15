@@ -35,7 +35,8 @@ export function LoadFundsModal({
   // Calculate transaction fee when numberOfVotes or rentExemptMinimum changes
   useEffect(() => {
     const calculateFee = async () => {
-      if (!program?.provider?.connection || !program?.provider?.wallet?.publicKey || numberOfVotes <= 0) {
+      // Only calculate fee if modal is open
+      if (!isOpen || !program?.provider?.connection || !program?.provider?.wallet?.publicKey || numberOfVotes <= 0) {
         setTransactionFee(0);
         return;
       }
@@ -63,7 +64,7 @@ export function LoadFundsModal({
     };
 
     calculateFee();
-  }, [numberOfVotes, rentExemptMinimum, program?.provider?.connection, program?.provider?.wallet?.publicKey, fundsAccountAddress, totalAmount]);
+  }, [isOpen, numberOfVotes, rentExemptMinimum, program?.provider?.connection, program?.provider?.wallet?.publicKey, fundsAccountAddress, totalAmount]);
 
   if (!isOpen) return null;
 
