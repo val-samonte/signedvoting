@@ -62,10 +62,12 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-center py-12">
-          <Spinner className="h-8 w-8 text-blue-600 animate-spin" />
-          <span className="ml-2 text-gray-600">Loading proposals...</span>
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+            <Spinner className="h-8 w-8 text-blue-600 animate-spin" />
+            <span className="ml-2 text-gray-600">Loading proposals...</span>
+          </div>
         </div>
       </div>
     );
@@ -73,11 +75,13 @@ export default function Home() {
 
   if (error) {
     return (
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <div className="text-red-800">
-            <h3 className="font-medium">Error loading proposals</h3>
-            <p className="text-sm mt-1">{error}</p>
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+            <div className="text-red-800">
+              <h3 className="font-medium">Error loading proposals</h3>
+              <p className="text-sm mt-1">{error}</p>
+            </div>
           </div>
         </div>
       </div>
