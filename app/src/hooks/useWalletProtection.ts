@@ -2,7 +2,7 @@
 
 import { useAtom } from 'jotai';
 import { userAtom } from '@/store';
-import { isWalletConnectedAtom, walletPublicKeyAtom } from '@/lib/anchor';
+import { isWalletConnectedAtom, walletPublicKeyAtom, isUserWalletConnectedAtom, userWalletAddressAtom } from '@/lib/anchor';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 
@@ -10,8 +10,19 @@ export function useWalletProtection(redirectPath?: string, disabled?: boolean) {
   const [user] = useAtom(userAtom);
   const [isWalletConnected] = useAtom(isWalletConnectedAtom);
   const [walletPublicKey] = useAtom(walletPublicKeyAtom);
+  const [isUserWalletConnected] = useAtom(isUserWalletConnectedAtom);
+  const [, setUserWalletAddress] = useAtom(userWalletAddressAtom);
   const router = useRouter();
   const hasRedirected = useRef(false);
+
+  // Set user's wallet address for comparison
+  useEffect(() => {
+    if (user?.wallet_address) {
+      setUserWalletAddress(user.wallet_address);
+    } else {
+      setUserWalletAddress(null);
+    }
+  }, [user?.wallet_address, setUserWalletAddress]);
 
   useEffect(() => {
     // Reset redirect flag when dependencies change
@@ -51,8 +62,8 @@ export function useWalletProtection(redirectPath?: string, disabled?: boolean) {
       return;
     }
 
-    // Check if connected wallet matches user's registered wallet
-    if (walletPublicKey.toBase58() !== user.wallet_address) {
+    // Check if connected wallet matches user's registered wallet using the new atom
+    if (!isUserWalletConnected) {
       if (!hasRedirected.current) {
         hasRedirected.current = true;
         const redirectUrl = currentUrl ? `/my-wallet?redirect=${encodeURIComponent(currentUrl)}` : '/my-wallet';
@@ -61,10 +72,10 @@ export function useWalletProtection(redirectPath?: string, disabled?: boolean) {
       return;
     }
 
-  }, [user, isWalletConnected, walletPublicKey, redirectPath, router, disabled]);
+  }, [user, isWalletConnected, walletPublicKey, isUserWalletConnected, redirectPath, router, disabled]);
 
   return {
-    isProtected: disabled ? true : (user?.wallet_address && isWalletConnected && walletPublicKey?.toBase58() === user.wallet_address),
+    isProtected: disabled ? true : (user?.wallet_address && isWalletConnected && isUserWalletConnected),
     user,
     isWalletConnected,
     walletPublicKey

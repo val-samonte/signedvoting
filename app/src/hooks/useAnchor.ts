@@ -4,7 +4,8 @@ import {
   anchorProviderAtom, 
   isWalletConnectedAtom, 
   walletPublicKeyAtom,
-  connectionAtom 
+  connectionAtom,
+  isUserWalletConnectedAtom
 } from '@/lib/anchor';
 
 export function useAnchor() {
@@ -13,6 +14,7 @@ export function useAnchor() {
   const [isWalletConnected] = useAtom(isWalletConnectedAtom);
   const [walletPublicKey] = useAtom(walletPublicKeyAtom);
   const [connection] = useAtom(connectionAtom);
+  const [isUserWalletConnected] = useAtom(isUserWalletConnectedAtom);
 
   return {
     program,
@@ -20,5 +22,6 @@ export function useAnchor() {
     connection,
     isWalletConnected,
     walletPublicKey,
+    isUserWalletConnected,
   };
 }

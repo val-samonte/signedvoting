@@ -24,7 +24,6 @@ export async function GET(
     const proposal = await prisma.proposal.findFirst({
       where: {
         id: proposalId,
-        author_id: session.user.id,
       },
       include: {
         author: true,

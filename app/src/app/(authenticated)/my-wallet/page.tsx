@@ -3,6 +3,7 @@
 import { useAtom } from 'jotai';
 import { userAtom, walletBalanceAtom, updateUserAtom } from '@/store';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { isUserWalletConnectedAtom, userWalletAddressAtom } from '@/lib/anchor';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useState, useEffect } from 'react';
 import { Connection, LAMPORTS_PER_SOL } from '@solana/web3.js';
@@ -14,6 +15,8 @@ export default function MyWalletPage() {
   const [walletBalance, setWalletBalance] = useAtom(walletBalanceAtom);
   const [, updateUser] = useAtom(updateUserAtom);
   const [isSigning, setIsSigning] = useState(false);
+  const [isUserWalletConnected] = useAtom(isUserWalletConnectedAtom);
+  const [, setUserWalletAddress] = useAtom(userWalletAddressAtom);
   
   const { publicKey, signMessage, connected, disconnect } = useWallet();
   const connection = new Connection('https://api.devnet.solana.com');
@@ -37,10 +40,19 @@ export default function MyWalletPage() {
     }
   }, [publicKey, setWalletBalance]);
 
+  // Set user's wallet address for comparison
+  useEffect(() => {
+    if (user?.wallet_address) {
+      setUserWalletAddress(user.wallet_address);
+    } else {
+      setUserWalletAddress(null);
+    }
+  }, [user?.wallet_address, setUserWalletAddress]);
+
   // Handle redirect after successful wallet linking
   useEffect(() => {
     const redirectParam = searchParams.get('redirect');
-    const isCorrectWallet = connected && publicKey?.toString() === user?.wallet_address;
+    const isCorrectWallet = connected && isUserWalletConnected;
     
     
     if (redirectParam && isCorrectWallet && user?.wallet_address) {
@@ -50,7 +62,7 @@ export default function MyWalletPage() {
       window.history.replaceState({}, '', url.toString());
       router.push(redirectParam);
     }
-  }, [connected, publicKey, user?.wallet_address, searchParams, router]);
+  }, [connected, isUserWalletConnected, user?.wallet_address, searchParams, router]);
 
   const handleSignMessage = async () => {
     if (!signMessage || !user || !publicKey || !user.id || !user.username) {
@@ -159,8 +171,8 @@ export default function MyWalletPage() {
   }
 
   // Case 2 & 3: User has linked wallet
-  const isCorrectWallet = connected && publicKey?.toString() === user.wallet_address;
-  const isWrongWallet = connected && publicKey?.toString() !== user.wallet_address;
+  const isCorrectWallet = connected && isUserWalletConnected;
+  const isWrongWallet = connected && !isUserWalletConnected;
 
   return (
     <div className="max-w-2xl mx-auto p-6">

@@ -7,7 +7,7 @@ import { ProposalPreview } from '@/components/ProposalPreview';
 import { useAtom } from 'jotai';
 import { proposalFormDataAtom } from '@/store/proposal';
 import { useAnchor } from '@/hooks/useAnchor';
-import { isWalletConnectedAtom, walletPublicKeyAtom } from '@/lib/anchor';
+import { isWalletConnectedAtom, walletPublicKeyAtom, userWalletAddressAtom } from '@/lib/anchor';
 import { userAtom } from '@/store';
 // import { useWalletProtection } from '@/hooks/useWalletProtection';
 import { PublicKey } from '@solana/web3.js';
@@ -37,10 +37,11 @@ type ProposalState = 'loading' | 'signing' | 'finalizing' | 'draft' | 'error';
 export default function ProposalDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isWalletConnected, walletPublicKey, program } = useAnchor();
+  const { isWalletConnected, walletPublicKey, program, isUserWalletConnected } = useAnchor();
   const [user] = useAtom(userAtom);
   const [isWalletConnectedState] = useAtom(isWalletConnectedAtom);
   const [walletPublicKeyState] = useAtom(walletPublicKeyAtom);
+  const [, setUserWalletAddress] = useAtom(userWalletAddressAtom);
   
   const [formData] = useAtom(proposalFormDataAtom);
   const [proposal, setProposal] = useState<ProposalData | null>(null);
@@ -71,6 +72,15 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
   // const { isProtected } = useWalletProtection();
 
   // No automatic wallet protection - we'll handle it manually after loading proposal
+
+  // Set user's wallet address for comparison
+  useEffect(() => {
+    if (user?.wallet_address) {
+      setUserWalletAddress(user.wallet_address);
+    } else {
+      setUserWalletAddress(null);
+    }
+  }, [user?.wallet_address, setUserWalletAddress]);
 
   // Check if we're continuing from a previous step
   const continueParam = searchParams.get('continue');
@@ -599,7 +609,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                         <p className="text-gray-600 text-sm font-medium mb-4">
                           Proposal does not have enough funds to accept votes
                         </p>
-                        {isWalletConnected && (
+                        {isUserWalletConnected && (
                           <button
                             onClick={() => setIsLoadFundsModalOpen(true)}
                             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 cursor-pointer"
@@ -669,7 +679,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
                         Insufficient balance for vote account creation (minimum: {rentExemptMinimum.toFixed(6)} SOL per vote)
                       </p>
                     )}
-                    {isWalletConnected && (
+                    {isUserWalletConnected && (
                       <button 
                         onClick={() => setIsLoadFundsModalOpen(true)}
                         className="mt-2 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer"

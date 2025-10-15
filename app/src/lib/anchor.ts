@@ -76,6 +76,20 @@ export const walletPublicKeyAtom = atom((get) => {
   return wallet?.publicKey || null;
 });
 
+// Helper function to check if user's wallet matches connected wallet
+export const isUserWalletConnectedAtom = atom((get) => {
+  const wallet = get(walletAtom);
+  // This will be set by the user store when user data is loaded
+  const userWalletAddress = get(userWalletAddressAtom);
+  
+  if (!wallet || !userWalletAddress) return false;
+  
+  return wallet.publicKey.toBase58() === userWalletAddress;
+});
+
+// Atom to store the user's wallet address for comparison
+export const userWalletAddressAtom = atom<string | null>(null);
+
 // Export types for convenience
 export type { Signedvoting };
 export { IDL };
