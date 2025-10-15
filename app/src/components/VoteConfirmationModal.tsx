@@ -1,16 +1,16 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useAtom } from 'jotai';
-import { userAtom } from '@/store';
-import { FreehandSignature } from './FreehandSignature';
-import { VoteButton } from './VoteButton';
-import { 
+import { useState } from "react";
+import { useAtom } from "jotai";
+import { userAtom } from "@/store";
+import { FreehandSignature } from "./FreehandSignature";
+import { VoteButton } from "./VoteButton";
+import {
   proposalSignatureAtomFamily,
-  processSignature
-} from '@/store/proposal';
-import { PublicKey, Transaction } from '@solana/web3.js';
-import { useAnchor } from '@/hooks/useAnchor';
+  processSignature,
+} from "@/store/proposal";
+import { PublicKey, Transaction } from "@solana/web3.js";
+import { useAnchor } from "@/hooks/useAnchor";
 
 interface VoteConfirmationModalProps {
   isOpen: boolean;
@@ -26,22 +26,26 @@ interface VoteConfirmationModalProps {
   onVoteSuccess?: (transactionSignature: string) => void;
 }
 
-export function VoteConfirmationModal({ 
-  isOpen, 
-  onClose, 
+export function VoteConfirmationModal({
+  isOpen,
+  onClose,
   chosenChoice,
   proposalId,
   proposalPda,
   payerPubkey,
-  onVoteSuccess
+  onVoteSuccess,
 }: VoteConfirmationModalProps) {
-  const [signatureStrokes, setSignatureStrokes] = useAtom(proposalSignatureAtomFamily(proposalId));
+  const [signatureStrokes, setSignatureStrokes] = useAtom(
+    proposalSignatureAtomFamily(proposalId)
+  );
   const [user] = useAtom(userAtom);
   const { program } = useAnchor();
   const hasSignature = signatureStrokes.length > 0;
   const [isVoteSubmitted, setIsVoteSubmitted] = useState(false);
   const [signaturePngBlob, setSignaturePngBlob] = useState<Blob | null>(null);
-  const [transactionSignature, setTransactionSignature] = useState<string | null>(null);
+  const [transactionSignature, setTransactionSignature] = useState<
+    string | null
+  >(null);
   const [isVoteProcessing, setIsVoteProcessing] = useState(false);
 
   if (!isOpen || !chosenChoice) return null;
@@ -60,19 +64,19 @@ export function VoteConfirmationModal({
 
   const downloadSignature = () => {
     if (!signaturePngBlob) return;
-    
+
     const url = URL.createObjectURL(signaturePngBlob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
     link.download = `proposal_${proposalId}_signature_vote.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    
+
     // Clean up the PNG blob
     setSignaturePngBlob(null);
-    
+
     // Close modal after download
     onClose();
   };
@@ -80,47 +84,46 @@ export function VoteConfirmationModal({
   const handleVoteClick = async () => {
     try {
       setIsVoteProcessing(true);
-      
+
       // Get actual user ID from auth context
       if (!user?.id) {
-        throw new Error('User ID is required for signature processing');
+        throw new Error("User ID is required for signature processing");
       }
       const userId = user.id.toString();
-      
+
       // 1. Get the keypair from PNG file using processSignature
-      const results = await processSignature(signatureStrokes, proposalId, userId);
-      
+      const results = await processSignature(
+        signatureStrokes,
+        proposalId,
+        userId
+      );
+
       if (!results.keypair) {
-        throw new Error('Failed to generate keypair from signature');
+        throw new Error("Failed to generate keypair from signature");
       }
-      
+
       // Store the PNG blob for later download
       setSignaturePngBlob(results.pngBlob);
 
-      // FORCE SUCCESS STATE
-      setIsVoteSubmitted(true);
-      setTransactionSignature('FAKE_TRANSACTION_SIGNATURE_FOR_TESTING');
-      /* 
-      
       // 2. Get the index of the user choice
       const choiceIndex = chosenChoice.index;
-      
+
       // 3. Get the 2nd level hash (sha256 of the sha256 used to generate the keypair)
       const signatureHash = results.finalSha256; // This is the 2nd level hash
-      
+
       // 4. Get proposal PDA and payer from props
       if (!proposalPda) {
-        throw new Error('Proposal PDA is required for voting');
+        throw new Error("Proposal PDA is required for voting");
       }
       if (!payerPubkey) {
-        throw new Error('Payer public key is required for voting');
+        throw new Error("Payer public key is required for voting");
       }
-      
+
       // 5. Create the vote transaction and partially sign it
       if (!program) {
-        throw new Error('Program not available');
+        throw new Error("Program not available");
       }
-      
+
       // Create the vote instruction
       const voteInstruction = await program.methods
         .vote(choiceIndex)
@@ -130,116 +133,63 @@ export function VoteConfirmationModal({
           payer: new PublicKey(payerPubkey), // Use the actual proposal payer
         })
         .instruction();
-      
+
       // Create a new transaction and add the instruction
       const transaction = new Transaction().add(voteInstruction);
-      
+
       // Set the recent blockhash and fee payer
-      const { blockhash } = await program.provider.connection.getLatestBlockhash();
+      const { blockhash } =
+        await program.provider.connection.getLatestBlockhash();
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = new PublicKey(payerPubkey); // Use the actual proposal payer as fee payer
-      
+
       // Partially sign the transaction with the voter keypair
       transaction.partialSign(results.keypair);
-      
+
       // Serialize the partially signed transaction
       const serializedTransaction = transaction.serialize({
         requireAllSignatures: false,
       });
-      
-      // Console log the props to be sent as partial transaction
-      console.log('=== VOTE TRANSACTION DATA ===');
-      console.log('Proposal PDA:', proposalPda);
-      console.log('Keypair Public Key:', results.keypair.publicKey.toString());
-      console.log('Choice Index:', choiceIndex);
-      console.log('2nd Level Hash (signature_hash):', signatureHash);
-      console.log('Partially Signed Transaction (base64):', serializedTransaction.toString('base64'));
-      console.log('=============================');
 
+      console.log("Keypair Public Key:", results.keypair.publicKey.toString());
+      
       // Send the vote to the backend
       try {
         const response = await fetch(`/api/vote/${proposalId}`, {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             signatureHash,
-            base64Tx: serializedTransaction.toString('base64'),
+            base64Tx: serializedTransaction.toString("base64"),
           }),
         });
 
         const result = await response.json();
 
-            if (response.ok) {
-              console.log('Vote submitted successfully:', result);
-              setIsVoteSubmitted(true);
-              setTransactionSignature(result.transactionSignature);
-              // Call the success callback if provided
-              if (onVoteSuccess && result.transactionSignature) {
-                onVoteSuccess(result.transactionSignature);
-              }
-            } else {
-              console.error('Vote submission failed:', result);
-              throw new Error(result.error || 'Failed to submit vote');
-            }
+        if (response.ok) {
+          console.log("Vote submitted successfully:", result);
+          setIsVoteSubmitted(true);
+          setTransactionSignature(result.transactionSignature);
+          // Call the success callback if provided
+          if (onVoteSuccess && result.transactionSignature) {
+            onVoteSuccess(result.transactionSignature);
+          }
+        } else {
+          console.error("Vote submission failed:", result);
+          throw new Error(result.error || "Failed to submit vote");
+        }
       } catch (apiError) {
-        console.error('Error submitting vote:', apiError);
+        console.error("Error submitting vote:", apiError);
         throw apiError;
       }
-      */
-      
-      /* COMMENTED OUT - PRESERVE FOR FUTURE USE
-      try {
-        // Get actual user ID from auth context
-        if (!user?.id) {
-          throw new Error('User ID is required for signature processing');
-        }
-        const userId = user.id.toString();
-        
-        // Process signature and get all results
-        const results = await processSignature(signatureStrokes, proposalId, userId);
-        
-        console.log('Voting with choice:', chosenChoice);
-        console.log('Signature SVG:', results.svgString);
-        console.log('PNG blob generated:', {
-          size: results.pngBlob.size,
-          type: results.pngBlob.type
-        });
-        console.log('SHA256:', results.sha256);
-        console.log('Keypair generated:', {
-          publicKey: results.keypair?.publicKey.toString(),
-          secretKey: results.keypair ? Array.from(results.keypair.secretKey) : null
-        });
-        console.log('Final SHA256:', results.finalSha256);
-        
-        // Automatically save a copy of the PNG when voting
-        // This ensures the user can derive the same keypair from the saved PNG
-        const url = URL.createObjectURL(results.pngBlob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `proposal_${proposalId}_signature_vote.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        
-        console.log('PNG automatically saved for keypair derivation');
-        
-        // TODO: Implement actual vote submission with results
-        
-      } catch (error) {
-        console.error('Error processing signature:', error);
-      }
-      */
-      
     } catch (error) {
-      console.error('Error processing signature:', error);
+      console.error("Error processing signature:", error);
     } finally {
       setIsVoteProcessing(false);
     }
   };
-
 
   return (
     <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
@@ -248,13 +198,25 @@ export function VoteConfirmationModal({
           {!isVoteSubmitted ? (
             <>
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold text-gray-900">You have chosen</h2>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  You have chosen
+                </h2>
                 <button
                   onClick={handleClose}
                   className="text-gray-400 hover:text-gray-600 cursor-pointer"
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               </div>
@@ -268,7 +230,7 @@ export function VoteConfirmationModal({
               </div>
 
               {/* FreehandSignature Component */}
-              <FreehandSignature 
+              <FreehandSignature
                 width={300}
                 height={200}
                 value={signatureStrokes}
@@ -285,7 +247,7 @@ export function VoteConfirmationModal({
               </button>
 
               {/* Vote Now Button */}
-              <VoteButton 
+              <VoteButton
                 disabled={!hasSignature || isVoteProcessing}
                 onClick={handleVoteClick}
                 text={isVoteProcessing ? "Processing..." : undefined}
@@ -294,7 +256,9 @@ export function VoteConfirmationModal({
           ) : (
             <>
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold text-gray-900">Vote Submitted</h2>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Vote Submitted
+                </h2>
               </div>
 
               {/* Display the chosen option as a button */}
@@ -308,9 +272,9 @@ export function VoteConfirmationModal({
               {/* Display the signature PNG */}
               {signaturePngBlob && (
                 <div className="flex justify-center">
-                  <img 
-                    src={URL.createObjectURL(signaturePngBlob)} 
-                    alt="Vote Signature" 
+                  <img
+                    src={URL.createObjectURL(signaturePngBlob)}
+                    alt="Vote Signature"
                     className="border border-gray-300 rounded-lg"
                     style={{ width: 300, height: 200 }}
                   />
@@ -320,7 +284,12 @@ export function VoteConfirmationModal({
               {/* See Vote Transaction Button */}
               {transactionSignature && (
                 <button
-                  onClick={() => window.open(`https://explorer.solana.com/tx/${transactionSignature}?cluster=devnet`, '_blank')}
+                  onClick={() =>
+                    window.open(
+                      `https://explorer.solana.com/tx/${transactionSignature}?cluster=devnet`,
+                      "_blank"
+                    )
+                  }
                   className="text-sm text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
                 >
                   See Vote Transaction

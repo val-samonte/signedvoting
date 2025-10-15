@@ -1,9 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useAtom } from 'jotai';
+import { userAtom } from '@/store';
 import { getSha256FromBlob, getKeypairFromUserAndBlob, getFinalSha256 } from '@/store/proposal';
 
 export default function VerifySignaturePage() {
+  const [user] = useAtom(userAtom);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [verificationResults, setVerificationResults] = useState<{
     sha256: string;
@@ -23,9 +26,14 @@ export default function VerifySignaturePage() {
     setIsProcessing(true);
 
     try {
+      // Get actual user ID from auth context (same as VoteConfirmationModal)
+      if (!user?.id) {
+        throw new Error('User ID is required for signature verification');
+      }
+      const userId = user.id.toString();
+      
       // Process the uploaded PNG file
       const sha256 = await getSha256FromBlob(file);
-      const userId = 'user_placeholder'; // Same as in VoteConfirmationModal
       const keypair = await getKeypairFromUserAndBlob(userId, file);
       const finalSha256 = await getFinalSha256(sha256);
 
