@@ -13,12 +13,12 @@ export function MarkdownRenderer({ children }: MarkdownRendererProps) {
       remarkPlugins={[remarkGfm]}
       components={{
         h1: ({ children }) => (
-          <h1 className="text-xl font-bold text-gray-900 mt-4 mb-2">
+          <h1 className="text-xl font-bold text-gray-900 mb-2">
             {children}
           </h1>
         ),
         h2: ({ children }) => (
-          <h2 className="text-lg font-semibold text-gray-900 mt-3 mb-2">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">
             {children}
           </h2>
         ),

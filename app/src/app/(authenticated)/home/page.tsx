@@ -128,7 +128,7 @@ export default function Home() {
           </div>
         </div>
       ) : (
-        <MasonryGrid columns={3} gap={24}>
+        <MasonryGrid>
           {proposals.map((proposal) => (
             <ProposalCard key={proposal.id} proposal={proposal} />
           ))}

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { MarkdownRenderer } from './MarkdownRenderer';
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
 
 interface ProposalCardProps {
   proposal: {
@@ -25,29 +25,20 @@ interface ProposalCardProps {
 export function ProposalCard({ proposal }: ProposalCardProps) {
   const isDraft = !proposal.pda;
   const contentRef = useRef<HTMLDivElement>(null);
-  const [showGradient, setShowGradient] = useState(false);
 
-  useEffect(() => {
-    const checkContentHeight = () => {
-      if (contentRef.current) {
-        const contentHeight = contentRef.current.scrollHeight;
-        setShowGradient(contentHeight > 300);
-      }
-    };
-
-    checkContentHeight();
-    // Check again after a short delay to ensure content is fully rendered
-    const timeoutId = setTimeout(checkContentHeight, 100);
-    
-    return () => clearTimeout(timeoutId);
-  }, [proposal.description]);
+  const [displayText, isTruncated] = useMemo(() => {
+    const words = proposal.description.split(" ");
+    const isTruncated = words.length > 30;
+    const displayText = words.slice(0, 30).join(" ") + (isTruncated ? " ..." : "");
+    return [displayText, isTruncated];
+  }, [proposal.description])
 
   return (
     <Link href={`/proposal/${proposal.id}`} className="block">
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all duration-300 hover:scale-105">
         {/* Header with name and draft status */}
-        <div className="mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+        <div className='mb-2'>
+          <h3 className="text-lg font-semibold text-gray-500 mb-2 line-clamp-2">
             {proposal.name}
           </h3>
           {isDraft && (
@@ -60,10 +51,10 @@ export function ProposalCard({ proposal }: ProposalCardProps) {
         {/* Description with markdown rendering and conditional gradient mask */}
         <div className="relative max-h-[300px] overflow-hidden">
           <div ref={contentRef} className="prose prose-sm max-w-none text-xs">
-            <MarkdownRenderer>{proposal.description}</MarkdownRenderer>
+            <MarkdownRenderer>{displayText}</MarkdownRenderer>
           </div>
           {/* Gradient mask only shown when content exceeds 300px */}
-          {showGradient && (
+          {isTruncated && (
             <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent pointer-events-none"></div>
           )}
         </div>
