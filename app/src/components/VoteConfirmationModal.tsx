@@ -23,6 +23,7 @@ interface VoteConfirmationModalProps {
   proposalId: number;
   proposalPda?: string;
   payerPubkey?: string;
+  onVoteSuccess?: (transactionSignature: string) => void;
 }
 
 export function VoteConfirmationModal({ 
@@ -31,7 +32,8 @@ export function VoteConfirmationModal({
   chosenChoice,
   proposalId,
   proposalPda,
-  payerPubkey
+  payerPubkey,
+  onVoteSuccess
 }: VoteConfirmationModalProps) {
   const [signatureStrokes, setSignatureStrokes] = useAtom(proposalSignatureAtomFamily(proposalId));
   const [user] = useAtom(userAtom);
@@ -39,6 +41,8 @@ export function VoteConfirmationModal({
   const hasSignature = signatureStrokes.length > 0;
   const [isVoteSubmitted, setIsVoteSubmitted] = useState(false);
   const [signaturePngBlob, setSignaturePngBlob] = useState<Blob | null>(null);
+  const [transactionSignature, setTransactionSignature] = useState<string | null>(null);
+  const [isVoteProcessing, setIsVoteProcessing] = useState(false);
 
   if (!isOpen || !chosenChoice) return null;
 
@@ -75,6 +79,8 @@ export function VoteConfirmationModal({
 
   const handleVoteClick = async () => {
     try {
+      setIsVoteProcessing(true);
+      
       // Get actual user ID from auth context
       if (!user?.id) {
         throw new Error('User ID is required for signature processing');
@@ -160,13 +166,18 @@ export function VoteConfirmationModal({
 
         const result = await response.json();
 
-        if (response.ok) {
-          console.log('Vote submitted successfully:', result);
-          setIsVoteSubmitted(true);
-        } else {
-          console.error('Vote submission failed:', result);
-          throw new Error(result.error || 'Failed to submit vote');
-        }
+            if (response.ok) {
+              console.log('Vote submitted successfully:', result);
+              setIsVoteSubmitted(true);
+              setTransactionSignature(result.transactionSignature);
+              // Call the success callback if provided
+              if (onVoteSuccess && result.transactionSignature) {
+                onVoteSuccess(result.transactionSignature);
+              }
+            } else {
+              console.error('Vote submission failed:', result);
+              throw new Error(result.error || 'Failed to submit vote');
+            }
       } catch (apiError) {
         console.error('Error submitting vote:', apiError);
         throw apiError;
@@ -218,6 +229,8 @@ export function VoteConfirmationModal({
       
     } catch (error) {
       console.error('Error processing signature:', error);
+    } finally {
+      setIsVoteProcessing(false);
     }
   };
 
@@ -267,8 +280,9 @@ export function VoteConfirmationModal({
 
               {/* Vote Now Button */}
               <VoteButton 
-                disabled={!hasSignature}
+                disabled={!hasSignature || isVoteProcessing}
                 onClick={handleVoteClick}
+                text={isVoteProcessing ? "Processing..." : undefined}
               />
             </>
           ) : (
@@ -278,8 +292,8 @@ export function VoteConfirmationModal({
               </div>
 
               {/* Display the chosen option as a button */}
-              <div className="flex items-center space-x-3 p-4 bg-green-600 text-white rounded-lg border border-green-600 shadow-sm">
-                <span className="flex-shrink-0 w-8 h-8 text-sm font-medium rounded-full flex items-center justify-center bg-white text-green-600">
+              <div className="flex items-center space-x-3 p-4 bg-blue-600 text-white rounded-lg border border-blue-600 shadow-sm">
+                <span className="flex-shrink-0 w-8 h-8 text-sm font-medium rounded-full flex items-center justify-center bg-white text-blue-600">
                   {chosenChoice.label}.
                 </span>
                 <span className="text-white">{chosenChoice.text}</span>
@@ -297,10 +311,20 @@ export function VoteConfirmationModal({
                 </div>
               )}
 
+              {/* See Vote Transaction Button */}
+              {transactionSignature && (
+                <button
+                  onClick={() => window.open(`https://explorer.solana.com/tx/${transactionSignature}?cluster=devnet`, '_blank')}
+                  className="text-sm text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                >
+                  See Vote Transaction
+                </button>
+              )}
+
               {/* Download Signature Button */}
               <button
                 onClick={downloadSignature}
-                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium cursor-pointer"
               >
                 Download Vote Signature
               </button>

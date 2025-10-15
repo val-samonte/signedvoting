@@ -176,6 +176,16 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
     }
   };
 
+  const handleVoteSuccess = async (transactionSignature: string) => {
+    // Refresh the funds account balance and vote status after successful voting
+    if (proposal) {
+      await Promise.all([
+        fetchFundsAccountBalance(proposal.payerPubkey),
+        checkUserVoteStatus(proposalId)
+      ]);
+    }
+  };
+
   const checkUserVoteStatus = async (proposalId: number) => {
     if (!user) return;
     
@@ -726,14 +736,22 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
         {proposalId && (
           <VoteConfirmationModal
             isOpen={isVoteConfirmationModalOpen}
-            onClose={() => {
+            onClose={async () => {
               setIsVoteConfirmationModalOpen(false);
               setChosenChoice(null);
+              // Refresh balance and vote status when modal closes
+              if (proposal) {
+                await Promise.all([
+                  fetchFundsAccountBalance(proposal.payerPubkey),
+                  checkUserVoteStatus(proposalId)
+                ]);
+              }
             }}
             chosenChoice={chosenChoice}
             proposalId={proposalId}
             proposalPda={proposal?.pda}
             payerPubkey={proposal?.payerPubkey}
+            onVoteSuccess={handleVoteSuccess}
           />
         )}
       </div>
