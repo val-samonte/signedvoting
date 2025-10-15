@@ -2,12 +2,12 @@
 
 import { useState, useCallback } from 'react';
 import { useAtom } from 'jotai';
+import { userAtom } from '@/store';
 import { FreehandSignature } from './FreehandSignature';
 import { VoteButton } from './VoteButton';
 import { 
   proposalSignatureAtomFamily,
-  processSignature,
-  getKeypairFromUserAndBlob
+  processSignature
 } from '@/store/proposal';
 import { getStroke } from 'perfect-freehand';
 
@@ -29,6 +29,7 @@ export function VoteConfirmationModal({
   proposalId
 }: VoteConfirmationModalProps) {
   const [signatureStrokes, setSignatureStrokes] = useAtom(proposalSignatureAtomFamily(proposalId));
+  const [user] = useAtom(userAtom);
   const hasSignature = signatureStrokes.length > 0;
   
   
@@ -91,9 +92,16 @@ export function VoteConfirmationModal({
   };
 
   const handleVoteClick = async () => {
+    // TODO: Implement actual vote submission
+    console.log('Vote clicked for choice:', chosenChoice);
+    
+    /* COMMENTED OUT - PRESERVE FOR FUTURE USE
     try {
-      // TODO: Get actual user ID from auth context
-      const userId = 'user_placeholder';
+      // Get actual user ID from auth context
+      if (!user?.id) {
+        throw new Error('User ID is required for signature processing');
+      }
+      const userId = user.id.toString();
       
       // Process signature and get all results
       const results = await processSignature(signatureStrokes, proposalId, userId);
@@ -129,6 +137,7 @@ export function VoteConfirmationModal({
     } catch (error) {
       console.error('Error processing signature:', error);
     }
+    */
   };
 
 
