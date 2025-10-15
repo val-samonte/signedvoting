@@ -625,7 +625,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
               {/* Choices - pushed to bottom on xl, normal flow below */}
               <div className="xl:flex-none">
                 <div className="relative">
-                  <div className={`flex flex-col xl:flex-row gap-4 ${votingState === 'insufficient_funds' ? 'opacity-60' : ''}`}>
+                  <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${votingState === 'insufficient_funds' ? 'opacity-60' : ''}`}>
                     {proposal.choices.map((choice, index) => {
                       const choiceLabel = String.fromCharCode(97 + index); // a, b, c, etc.
                       const isDisabled = votingState === 'insufficient_funds' || votingState === 'already_voted';

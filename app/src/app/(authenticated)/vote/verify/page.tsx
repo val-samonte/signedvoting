@@ -155,14 +155,14 @@ export default function VerifyVotePage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-2xl mx-auto px-4">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6">
-            Verify My Vote
-          </h1>
-          
-          <p className="text-gray-600 mb-6">
-            Upload the signature that you downloaded when voting to verify your vote on the blockchain.
-          </p>
+        <div className="md:bg-white md:shadow-md md:p-6 rounded-none md:rounded-lg">
+            <h1 className="text-2xl font-bold text-gray-900 mb-6">
+              Verify My Vote
+            </h1>
+            
+            <p className="text-gray-600 mb-6">
+              Upload the signature that you downloaded when voting to verify your vote on the blockchain.
+            </p>
 
           {/* File Upload Area */}
           <div className="mb-6">
@@ -219,7 +219,7 @@ export default function VerifyVotePage() {
 
           {/* Error State */}
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
               <div className="flex items-center">
                 <svg className="w-5 h-5 text-red-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -242,7 +242,7 @@ export default function VerifyVotePage() {
                   <p className="text-green-700 font-medium">Vote verified successfully!</p>
                 </div>
                 
-                <div className="flex gap-6">
+                <div className="flex flex-col md:flex-row gap-6">
                   {/* Left Column - Details */}
                   <div className="flex-auto space-y-3 text-sm">
                     <div>
@@ -282,7 +282,7 @@ export default function VerifyVotePage() {
                         <img
                           src={URL.createObjectURL(uploadedFile)}
                           alt="Uploaded signature"
-                          className="w-32 h-20 object-contain rounded"
+                          className="w-full md:w-32 h-auto md:h-20 object-contain rounded"
                         />
                       </div>
                     )}
@@ -291,7 +291,6 @@ export default function VerifyVotePage() {
               </div>
             </div>
           )}
-
         </div>
       </div>
     </div>
