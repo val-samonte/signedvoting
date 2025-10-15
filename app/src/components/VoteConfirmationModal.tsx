@@ -240,7 +240,7 @@ export function VoteConfirmationModal({
               {/* Clear Signature Button */}
               <button
                 onClick={clearSignature}
-                disabled={!hasSignature}
+                disabled={!hasSignature || isVoteProcessing}
                 className="text-sm text-gray-400 hover:text-gray-600 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:hover:text-gray-400"
               >
                 Clear Signature
