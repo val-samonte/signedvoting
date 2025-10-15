@@ -723,14 +723,17 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
         )}
 
         {/* Vote Confirmation Modal */}
-        <VoteConfirmationModal
-          isOpen={isVoteConfirmationModalOpen}
-          onClose={() => {
-            setIsVoteConfirmationModalOpen(false);
-            setChosenChoice(null);
-          }}
-          chosenChoice={chosenChoice}
-        />
+        {proposalId && (
+          <VoteConfirmationModal
+            isOpen={isVoteConfirmationModalOpen}
+            onClose={() => {
+              setIsVoteConfirmationModalOpen(false);
+              setChosenChoice(null);
+            }}
+            chosenChoice={chosenChoice}
+            proposalId={proposalId}
+          />
+        )}
       </div>
     );
   }

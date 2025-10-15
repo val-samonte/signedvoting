@@ -1,8 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import { useAtom } from 'jotai';
 import { FreehandSignature } from './FreehandSignature';
 import { VoteButton } from './VoteButton';
+import { proposalSignatureAtomFamily } from '@/store/proposal';
+import { getStroke } from 'perfect-freehand';
 
 interface VoteConfirmationModalProps {
   isOpen: boolean;
@@ -12,15 +15,52 @@ interface VoteConfirmationModalProps {
     text: string;
     label: string;
   } | null;
+  proposalId: number;
 }
 
 export function VoteConfirmationModal({ 
   isOpen, 
   onClose, 
-  chosenChoice 
+  chosenChoice,
+  proposalId
 }: VoteConfirmationModalProps) {
-  const [hasSignature, setHasSignature] = useState(false);
-  const [signatureSvg, setSignatureSvg] = useState<string>('');
+  const [signaturePoints, setSignaturePoints] = useAtom(proposalSignatureAtomFamily(proposalId));
+  const hasSignature = signaturePoints.length > 0;
+
+  // Convert points to SVG string for voting
+  const getSignatureSvg = useCallback((points: number[][]) => {
+    if (points.length === 0) return '';
+    
+    const stroke = getStroke(points, {
+      size: 4,
+      thinning: 0.5,
+      smoothing: 0.5,
+      streamline: 0.5,
+      simulatePressure: true,
+      last: true,
+    });
+
+    if (stroke.length < 4) return '';
+
+    const average = (a: number, b: number) => (a + b) / 2;
+    let a = stroke[0];
+    let b = stroke[1];
+    const c = stroke[2];
+
+    let pathData = `M${a[0].toFixed(2)},${a[1].toFixed(2)} Q${b[0].toFixed(2)},${b[1].toFixed(2)} ${average(b[0], c[0]).toFixed(2)},${average(b[1], c[1]).toFixed(2)} T`;
+
+    for (let i = 2, max = stroke.length - 1; i < max; i++) {
+      a = stroke[i];
+      b = stroke[i + 1];
+      pathData += `${average(a[0], b[0]).toFixed(2)},${average(a[1], b[1]).toFixed(2)} `;
+    }
+
+    pathData += 'Z';
+    
+    return `<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">
+      <path d="${pathData}" fill="black" stroke="black" stroke-width="1"/>
+    </svg>`;
+  }, []);
 
   if (!isOpen || !chosenChoice) return null;
 
@@ -28,15 +68,16 @@ export function VoteConfirmationModal({
     onClose();
   };
 
-  const handleSignatureChange = (hasSig: boolean) => {
-    setHasSignature(hasSig);
+  const handleSignatureChange = (points: number[][]) => {
+    setSignaturePoints(points);
   };
 
-  const handleSignatureSvgChange = (svgString: string) => {
-    setSignatureSvg(svgString);
+  const clearSignature = () => {
+    setSignaturePoints([]);
   };
 
   const handleVoteClick = () => {
+    const signatureSvg = getSignatureSvg(signaturePoints);
     // TODO: Implement vote submission with signatureSvg
     console.log('Voting with choice:', chosenChoice);
     console.log('Signature SVG:', signatureSvg);
@@ -70,9 +111,18 @@ export function VoteConfirmationModal({
           <FreehandSignature 
             width={300}
             height={200}
-            onSignatureChange={handleSignatureChange}
-            onChange={handleSignatureSvgChange}
+            value={signaturePoints}
+            onChange={handleSignatureChange}
           />
+
+          {/* Clear Signature Button */}
+          <button
+            onClick={clearSignature}
+            disabled={!hasSignature}
+            className="text-sm text-gray-400 hover:text-gray-600 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:hover:text-gray-400"
+          >
+            Clear Signature
+          </button>
 
           {/* Vote Now Button */}
           <VoteButton 

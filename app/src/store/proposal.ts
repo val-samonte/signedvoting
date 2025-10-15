@@ -1,4 +1,5 @@
 import { atom } from 'jotai';
+import { atomFamily } from 'jotai/utils';
 
 // Proposal form data atom
 export const proposalFormDataAtom = atom({
@@ -183,4 +184,9 @@ export const resetProposalFormAtom = atom(
     });
     set(proposalFormErrorsAtom, {});
   }
+);
+
+// AtomFamily for storing signature points by proposal ID
+export const proposalSignatureAtomFamily = atomFamily((proposalId: number) => 
+  atom<number[][]>([])
 );

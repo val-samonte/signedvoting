@@ -1,24 +1,26 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { getStroke } from 'perfect-freehand';
 
 interface FreehandSignatureProps {
   width?: number;
   height?: number;
-  onSignatureChange?: (hasSignature: boolean) => void;
-  onChange?: (svgString: string) => void;
+  value?: number[][]; // The points array
+  onChange?: (points: number[][]) => void; // Called when points change
 }
 
 export function FreehandSignature({ 
   width = 300, 
   height = 200, 
-  onSignatureChange,
-  onChange 
+  value = [],
+  onChange
 }: FreehandSignatureProps) {
-  const [points, setPoints] = useState<number[][]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
+  
+  // Use the controlled value prop
+  const points = value;
 
   const getSvgPathFromStroke = useCallback((stroke: number[][]) => {
     if (stroke.length < 4) {
@@ -58,9 +60,9 @@ export function FreehandSignature({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    setPoints([[x, y, 0.5]]);
+    onChange?.([[x, y, 0.5]]);
     setIsDrawing(true);
-  }, []);
+  }, [onChange]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDrawing || !svgRef.current) return;
@@ -69,34 +71,12 @@ export function FreehandSignature({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    setPoints(prev => [...prev, [x, y, 0.5]]);
-  }, [isDrawing]);
+    onChange?.([...points, [x, y, 0.5]]);
+  }, [isDrawing, points, onChange]);
 
   const handlePointerUp = useCallback(() => {
     setIsDrawing(false);
-    if (points.length > 0) {
-      onSignatureChange?.(true);
-      
-      // Generate SVG string and call onChange
-      const stroke = getStroke(points, {
-        size: 4,
-        thinning: 0.5,
-        smoothing: 0.5,
-        streamline: 0.5,
-        simulatePressure: true,
-        last: true,
-      });
-      const pathData = getSvgPathFromStroke(stroke);
-      const svgString = generateSvgString(pathData);
-      onChange?.(svgString);
-    }
-  }, [points, onSignatureChange, onChange, getSvgPathFromStroke, generateSvgString]);
-
-  const clearSignature = useCallback(() => {
-    setPoints([]);
-    onSignatureChange?.(false);
-    onChange?.('');
-  }, [onSignatureChange, onChange]);
+  }, []);
 
   const stroke = getStroke(points, {
     size: 4,
@@ -141,14 +121,6 @@ export function FreehandSignature({
           </div>
         )}
       </div>
-
-      <button
-        onClick={clearSignature}
-        disabled={points.length === 0}
-        className="px-3 py-1 text-sm border border-gray-300 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:text-gray-400 text-gray-600 hover:text-gray-800 hover:bg-gray-50"
-      >
-        Clear
-      </button>
     </div>
   );
 }
