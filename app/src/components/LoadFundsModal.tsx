@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
 import { useAnchor } from '@/hooks/useAnchor';
+import { Spinner } from '@phosphor-icons/react';
 
 interface LoadFundsModalProps {
   isOpen: boolean;
@@ -157,7 +158,7 @@ export function LoadFundsModal({
             >
               {isLoading ? (
                 <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  <Spinner className="h-4 w-4 text-white mr-2 animate-spin" />
                   Loading...
                 </div>
               ) : (

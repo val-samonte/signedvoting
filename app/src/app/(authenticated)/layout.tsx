@@ -6,6 +6,7 @@ import { Navigation } from '@/components/Navigation';
 import { useState, useEffect } from 'react';
 import { getSession } from '@/lib/session';
 import { loginAtom } from '@/store';
+import { Spinner } from '@phosphor-icons/react';
 
 // Login/Register Card Component
 function LoginCard() {
@@ -58,7 +59,7 @@ export default function AuthenticatedLayout({
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <Spinner className="h-8 w-8 text-blue-600 mx-auto animate-spin" />
           <p className="mt-2 text-gray-600">Loading...</p>
         </div>
       </div>

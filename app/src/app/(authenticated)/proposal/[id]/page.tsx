@@ -11,7 +11,7 @@ import { isWalletConnectedAtom, walletPublicKeyAtom } from '@/lib/anchor';
 import { userAtom } from '@/store';
 // import { useWalletProtection } from '@/hooks/useWalletProtection';
 import { PublicKey } from '@solana/web3.js';
-import { PauseIcon } from '@phosphor-icons/react';
+import { PauseIcon, Spinner } from '@phosphor-icons/react';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { LoadFundsModal } from '@/components/LoadFundsModal';
 import { trimAddress, computeProposalHash, calculateVoteAccountRentExemptMinimum } from '@/lib/utils';
@@ -353,7 +353,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
         return (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <div className="flex items-center">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
+              <Spinner className="h-4 w-4 text-blue-600 mr-3 animate-spin" />
               <span className="text-blue-800">Loading proposal...</span>
             </div>
           </div>
@@ -366,7 +366,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
           return (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <div className="flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
+                <Spinner className="h-4 w-4 text-blue-600 mr-3 animate-spin" />
                 <span className="text-blue-800">Waiting for wallet connection...</span>
               </div>
             </div>
@@ -376,7 +376,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ id: s
         return (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <div className="flex items-center">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
+              <Spinner className="h-4 w-4 text-blue-600 mr-3 animate-spin" />
               <span className="text-blue-800">Proposal is pending, awaiting to sign transaction</span>
             </div>
           </div>

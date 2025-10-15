@@ -6,6 +6,7 @@ import { useAtom } from 'jotai';
 import { userAtom } from '@/store';
 import { ProposalCard } from '@/components/ProposalCard';
 import { MasonryGrid } from '@/components/MasonryGrid';
+import { Spinner } from '@phosphor-icons/react';
 
 interface Proposal {
   id: number;
@@ -61,9 +62,9 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto p-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <Spinner className="h-8 w-8 text-blue-600 animate-spin" />
           <span className="ml-2 text-gray-600">Loading proposals...</span>
         </div>
       </div>
@@ -84,8 +85,9 @@ export default function Home() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="mb-6">
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">{pageTitle}</h2>
         <p className="text-gray-600">
           {isMyProposals 
@@ -128,6 +130,7 @@ export default function Home() {
           ))}
         </MasonryGrid>
       )}
+      </div>
     </div>
   );
 }
