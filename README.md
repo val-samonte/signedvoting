@@ -2,6 +2,8 @@
 
 A **Web2.5** proof-of-concept voting system that enables wallet-less voting on Solana while maintaining privacy and cryptographic integrity.
 
+<img width="1917" height="879" alt="image" src="https://github.com/user-attachments/assets/6a005a9a-c2bc-4e46-8772-711a32d90aec" />
+
 ## 🎯 Overview
 
 This project demonstrates how people can participate in blockchain-based voting without requiring Web3 wallet onboarding. Users draw their signature to generate a unique keypair, which is then used to cast votes. The system maintains privacy while ensuring vote integrity through cryptographic signatures.
