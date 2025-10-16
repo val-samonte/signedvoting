@@ -160,6 +160,8 @@ This project demonstrates how people can participate in blockchain-based voting 
 
 This is a **proof-of-concept** implementation created for educational and experimental purposes. The author is not a cryptography expert, and this implementation may contain security vulnerabilities. **Do not use in production** without proper security auditing and additional development.
 
+Vibe coded in 2 days using Cursor.
+
 ## 🤝 Contributing
 
 This project was developed as a proof-of-concept for a niche community. Contributions, improvements, and security reviews are welcome.
